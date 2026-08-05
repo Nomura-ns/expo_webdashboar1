@@ -1,0 +1,26 @@
+.op-status__layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.op-status__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.op-status__card,
+.op-status__full {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.op-status__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}

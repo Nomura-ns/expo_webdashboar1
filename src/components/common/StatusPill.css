@@ -1,0 +1,57 @@
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11spx;
+  letter-spacing: 0.06em;
+  padding: 3px 9px 3px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.status-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.status-pill--running {
+  color: var(--accent-green);
+  border-color: color-mix(in srgb, var(--accent-green) 40%, var(--border));
+}
+.status-pill--running .status-pill__dot {
+  background: var(--accent-green);
+  box-shadow: 0 0 6px var(--accent-green);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+.status-pill--idle {
+  color: var(--text-secondary);
+}
+.status-pill--idle .status-pill__dot {
+  background: var(--text-secondary);
+}
+
+.status-pill--warning {
+  color: var(--accent-amber);
+  border-color: color-mix(in srgb, var(--accent-amber) 40%, var(--border));
+}
+.status-pill--warning .status-pill__dot {
+  background: var(--accent-amber);
+  box-shadow: 0 0 6px var(--accent-amber);
+}
+
+.status-pill--stopped {
+  color: var(--accent-red);
+  border-color: color-mix(in srgb, var(--accent-red) 40%, var(--border));
+}
+.status-pill--stopped .status-pill__dot {
+  background: var(--accent-red);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

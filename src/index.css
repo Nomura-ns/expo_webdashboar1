@@ -1,0 +1,248 @@
+body {
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.logo {
+  width: 150px;
+  height: 25px;
+}
+
+/* --- App ヘッダー --- */
+.app-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-sizing: border-box;
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.app-header__title {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- 設定パネル --- */
+.settings-panel {
+  position: fixed;
+  top: 57px;
+  right: 16px;
+  z-index: 100;
+  border-radius: 12px;
+  padding: 20px 24px;
+  min-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.settings-row__label {
+  width: 80px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.settings-row__range {
+  width: 180px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* --- ダッシュボード --- */
+.dashboard-page {
+  padding: 35px;
+  box-sizing: border-box;
+  width: 100%;
+  height: calc(100svh - 56px); /* 56px は app-header のおおよその高さ。実測値に調整してください */
+  display: flex;
+  flex-direction: column;
+}
+
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.status-bar__meta {
+  margin-left: auto;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr; /* ← 追加：2行想定なら1fr 1fr、行数に応じて調整 */
+  gap: 24px;
+  flex: 1;
+  min-height: 0; /* グリッドが縮めるように */
+}
+
+
+.panel-card {
+  border-radius: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  display: flex; /* ← 追加：中の PanelFrame に高さを伝える */
+}
+
+/* --- パネル軸コントロール --- */
+.panel-axis-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.panel-axis-controls__title {
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.axis-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.axis-group__label {
+  width: 36px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.axis-group__select {
+  min-width: 0;
+}
+
+/* --- 制御フロー --- */
+.control-page {
+  padding: 35px 120px;
+  max-width: 1200px;
+  box-sizing: border-box;
+}
+
+/* --- タブレット（1列） --- */
+@media (max-width: 900px) {
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-page {
+    padding: 24px 20px;
+  }
+}
+
+/* --- スマホ --- */
+@media (max-width: 768px) {
+  .logo {
+    width: 110px;
+    height: 18px;
+  }
+
+  .app-header {
+    padding: 8px 12px;
+  }
+
+  .settings-panel {
+    left: 8px;
+    right: 8px;
+    top: 52px;
+    min-width: unset;
+    padding: 16px;
+  }
+
+  .settings-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .settings-row__range {
+    width: 100%;
+    flex: 1;
+  }
+
+  .dashboard-page {
+    padding: 10px;
+  }
+
+  .status-bar {
+    gap: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .status-bar__meta {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .panel-grid {
+    gap: 14px;
+  }
+
+  .panel-card {
+    padding: 10px;
+  }
+
+  .panel-axis-controls--mobile {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .panel-axis-controls--mobile .axis-group {
+    width: 100%;
+  }
+
+  .panel-axis-controls--mobile .axis-group__select {
+    flex: 1;
+    width: 100%;
+    max-width: none;
+  }
+
+  .control-page {
+    padding: 12px 10px;
+  }
+}

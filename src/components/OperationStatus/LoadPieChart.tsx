@@ -1,4 +1,4 @@
-import {PieChart, Pie, Cell, ResponsiveContainer, } from "recharts";
+import {PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, } from "recharts";
 
 const COLORS = [
   "#00D2FF",
@@ -17,13 +17,14 @@ interface Props{
 
 export default function LoadPieChart({data}:Props){
     return(
-        <ResponsiveContainer width="100%" height={180}>
+        <ResponsiveContainer width="100%" height={200}>
             <PieChart>
                <Pie
                     data={data}
                     dataKey="value"
                     nameKey="name"
                     outerRadius={60}
+                    label={({name, percent}) => `${name} ${((percent ?? 0)*100).toFixed(0)}%`}
                 >
                     {data.map((_,i)=>
                         <Cell
@@ -32,6 +33,8 @@ export default function LoadPieChart({data}:Props){
                         />
                     )}
                 </Pie>
+                <Tooltip/>
+                <Legend/>
             </PieChart>
         </ResponsiveContainer>
     )

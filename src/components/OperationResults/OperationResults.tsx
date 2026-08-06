@@ -60,7 +60,7 @@ export default function OperationResults({ theme, series, isEditing, activeStep,
   const grandTotal = Math.max(totals.reduce((sum, s) => sum + s.total, 0), 1)
 
   return (
-    <PanelFrame index="02" title="稼働実績" subtitle="各ジョブ実行回数（日別）" className="op-results">
+    <PanelFrame index="02" title="稼働実績" subtitle="ROBOT PERFORMANCE" className="op-results">
       <div className="op-results__top">
         <div className="op-results__legend">
           {series.map((s) => (

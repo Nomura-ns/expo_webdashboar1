@@ -12,7 +12,7 @@ export interface JobDefinition {
 
 export const JOB_DEFINITIONS: JobDefinition[] = [
   { id: 'pick-store',   jobName: '刃物ピック・格納',       shortName: 'ピック/格納', robot: 'A', phase: 'setting',    steps: [1, 6, 7, 22],      color: '#4dd0e1' },
-  { id: 'insert-fit',   jobName: '挿入・勘合',             shortName: '挿入',        robot: 'A', phase: 'setting',    steps: [2],                color: '#29b6f6' },
+  { id: 'insert-fit',   jobName: '挿入・勘合',             shortName: '挿入・勘合',        robot: 'A', phase: 'setting',    steps: [2],                color: '#29b6f6' },
   { id: 'position',     jobName: '撮影・位置決め',         shortName: '位置決め',    robot: 'A', phase: 'setting',    steps: [3, 4],             color: '#42a5f5' },
   { id: 'screw-tighten',jobName: 'ネジ締め・ツール準備',   shortName: 'ネジ締め',    robot: 'B', phase: 'setting',    steps: [5, 19],            color: '#ffb74d' },
   { id: 'screw-loosen', jobName: 'ネジ緩め',               shortName: 'ネジ緩め',    robot: 'B', phase: 'extraction', steps: [8],                color: '#ff8a65' },

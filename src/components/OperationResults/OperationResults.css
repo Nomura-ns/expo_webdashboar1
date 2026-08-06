@@ -86,3 +86,27 @@
 .op-results__chip.is-active {
   font-weight: bold;
 }
+/* ===== 凡例 ===== */
+
+.op-results__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px; /* 縦の折り返し間隔 / 横の項目間隔 */
+}
+
+.op-results__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.op-results__swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}

@@ -1,21 +1,15 @@
 import PanelFrame from '../common/PanelFrame'
 import type { Theme } from '../../types'
 
-import RobotTrendChart from './RobotTrendChart'
-import CycleBarChart from './CycleBarChart'
+import RobotStatusPanel from './RobotStatusPanel'
+import CycleTimeDisplay from './CycleTimeDisplay'
 import LoadPieChart from './LoadPieChart'
 
 import './OperationStatus.css'
 
-interface TrendPoint {
-  time: string
+interface RobotStat {
   speed: number
   torque: number
-}
-
-interface CycleData {
-  job: string
-  cycle: number
 }
 
 interface PieData {
@@ -26,10 +20,11 @@ interface PieData {
 interface OperationStatusProps {
   theme: Theme
 
-  robotA: TrendPoint[]
-  robotB: TrendPoint[]
+  robotA: RobotStat
+  robotB: RobotStat
 
-  cycle: CycleData[]
+  // ロボットA・Bを合算した1つのサイクルタイム（秒）
+  cycleTime: number
 
   loadA: PieData[]
   loadB: PieData[]
@@ -39,7 +34,7 @@ export default function OperationStatus({
   theme,
   robotA,
   robotB,
-  cycle,
+  cycleTime,
   loadA,
   loadB,
 }: OperationStatusProps) {
@@ -59,33 +54,33 @@ export default function OperationStatus({
             <div className="op-status__title">
               ロボットA 速度・トルク
             </div>
-            <RobotTrendChart data={robotA} />
+            <RobotStatusPanel data={robotA} />
           </div>
           <div className="op-status__card">
             <div className="op-status__title">
               ロボットB 速度・トルク
             </div>
-            <RobotTrendChart data={robotB} />
+            <RobotStatusPanel data={robotB} />
           </div>
         </div>
-        {/* サイクルタイム */}
+        {/* サイクルタイム（A・B合算） */}
         <div className="op-status__full">
           <div className="op-status__title">
-            ジョブ別サイクルタイム
+            サイクルタイム（A・B合算）
           </div>
-          <CycleBarChart data={cycle} />
+          <CycleTimeDisplay seconds={cycleTime} />
         </div>
-        {/* 負荷割合 */}
+        {/* 稼働時間内訳 */}
         <div className="op-status__row">
           <div className="op-status__card">
             <div className="op-status__title">
-              ロボットA 負荷割合
+              ロボットA 稼働時間内訳
             </div>
             <LoadPieChart data={loadA} />
           </div>
           <div className="op-status__card">
             <div className="op-status__title">
-              ロボットB 負荷割合
+              ロボットB 稼働時間内訳
             </div>
             <LoadPieChart data={loadB} />
           </div>

@@ -56,7 +56,7 @@
 
 .nameplate-quiz__ring-value {
   font-family: var(--font-mono);
-  font-size: 60px; 
+  font-size: 50px; 
   font-weight: 800;
   fill: var(--nq-accent, #38bdf8);
 }
@@ -222,7 +222,7 @@
 }
 
 .nameplate-quiz__question-text {
-  font-size: clamp(100px, 2.2vw, 32px);
+  font-size: clamp(90px, 2.2vw, 32px);
   font-weight: 600;
   color: var(--nq-text, #f1f5f9);
   text-align: center;

@@ -55,23 +55,12 @@ const sampleSeries: JobSeries[] = JOB_DEFINITIONS.map((def) => ({
 }))
 
 // 稼働状況（anomalyページ）用のサンプルデータ
-const robotA = [
-  { time: '10:00', speed: 80, torque: 55 },
-  { time: '10:01', speed: 84, torque: 58 },
-  { time: '10:02', speed: 78, torque: 53 },
-]
+// ロボットA/Bは直近の速度・トルクの数値のみ（グラフ表示はしない）
+const robotA = { speed: 78, torque: 53 }
+const robotB = { speed: 82, torque: 55 }
 
-const robotB = [
-  { time: '10:00', speed: 76, torque: 48 },
-  { time: '10:01', speed: 79, torque: 52 },
-  { time: '10:02', speed: 82, torque: 55 },
-]
-
-const cycle = [
-  { job: 'Job1', cycle: 4.2 },
-  { job: 'Job2', cycle: 3.8 },
-  { job: 'Job3', cycle: 5.1 },
-]
+// サイクルタイムはジョブ別・ロボット別ではなく、A・B合算の1つの値として扱う
+const cycleTime = 4.4
 
 const loadA = [
   { name: '動作', value: 70 },
@@ -308,7 +297,7 @@ export default function App() {
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'anomaly' ? 'flex' : 'none' }}>
-          <OperationStatus theme={theme} robotA={robotA} robotB={robotB} cycle={cycle} loadA={loadA} loadB={loadB} />
+          <OperationStatus theme={theme} robotA={robotA} robotB={robotB} cycleTime={cycleTime} loadA={loadA} loadB={loadB} />
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'quiz' ? 'flex' : 'none' }}>

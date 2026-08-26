@@ -35,27 +35,87 @@ const EXTRACTION_FLOW: FlowNode[] = [
 
 interface JobFlowDiagramProps {
   theme: Theme
-  /** PLCのDアドレスから受け取る現在工程ステップ値。一致するノードを強調表示します。 */
   activeStep?: number
-  /** 現在のサイクル数（本日/直近の完了回数など） */
   cycleCurrent?: number
-  /** 全体サイクル数（目標・予定回数） */
   cycleTotal?: number
+  /** ジョブ実行回数タブの色編集で上書きされた色（jobId → color） */
+  colorOverrides?: Record<string, string>
 }
 
 // ── レイアウト定数（フォントサイズに合わせて余白を確保） ──
-const BOX_W = 700
-const BOX_H = 96
-const ROW_GAP = 26              // 同フェーズ内、矢印分のギャップ
+const BOX_W = 650
+const BOX_H = 85
+const ROW_GAP = 40              // 同フェーズ内、矢印分のギャップ
 const STEP = BOX_H + ROW_GAP    // ノード間の縦ステップ
-const MARGIN_X = 40
+const MARGIN_X = 35
 const TITLE_GAP = 40            // タイトルから最初のボックスまで
 const PHASE_END_GAP = 32        // フェーズ末尾ボックス → 区切りテキストまで
-const DIVIDER_TO_TITLE_GAP = 46 // 区切りテキスト → 次フェーズタイトルまで
-const TITLE_TO_BOX_GAP = 28     // 次フェーズタイトル → 最初のボックスまで
+const DIVIDER_TO_TITLE_GAP = 56 // 区切りテキスト → 次フェーズタイトルまで
+const TITLE_TO_BOX_GAP = 40     // 次フェーズタイトル → 最初のボックスまで
+
+// ── ループ矢印（曲線）の調整用パラメータ ──
+// 各ループ矢印は「開始点 → 終了点」を結ぶベジェ曲線です。
+// - bulge      : 曲線がどれだけ横に膨らむか（px）。大きいほど弧が大きくなる
+// - ctrl1Ratio : 開始点側の制御点を、開始〜終了の縦距離のどの位置に置くか（0=開始点と同じ高さ）
+// - ctrl2Ratio : 終了点側の制御点を、同じく縦距離のどの位置に置くか（1=終了点と同じ高さ）
+// 縦距離（ノード数）が違うループでも見た目のバランスが取れるよう、
+// それぞれ個別に数値を変えて調整してください。
+// ── ♦（分岐）の頂点がボックスの上下端からどれだけ外側に飛び出すか ──
+// renderBox内のpolygon座標と、下のDECISION_ARROW_CONFIGの両方から参照する共通値。
+const DIAMOND_TOP_INSET = 5    // 上頂点が n.y からどれだけ上に飛び出すか
+const DIAMOND_BOTTOM_INSET = 2 // 下頂点が n.y+BOX_H からどれだけ下に飛び出すか
+
+// ── ♦に入る矢印／♦から出る矢印の長さ調整用パラメータ ──
+// ♦は上下の頂点がボックス枠より外側に飛び出しているため、通常のボックス間矢印と
+// 同じ計算だと「矢印の先端が♦の下に隠れる」「♦との間に隙間ができる」ことがあります。
+// ここを個別に調整してください（pxの数値。プラスにするほど矢印は短く＝隙間が増え、
+// マイナスにするほど矢印は長く＝♦に食い込みます）。
+const DECISION_ARROW_CONFIG = {
+  intoGap: 30,  // 手前のボックス →♦ に入る矢印。0で♦の上頂点にぴったり届く
+  outGap: -30,   // ♦ → 次のボックス に出る矢印（NG方向）。0で♦の下頂点からぴったり始まる
+}
+
+const LOOP_CONFIG = {
+  // ①セッティングフェーズ：先頭ノードへ戻る矢印（4ノード分）
+  settingLoop: {
+    bulge: 90,
+    ctrl1Ratio: 0.2,
+    ctrl2Ratio: 0.8,
+  },
+  // ②取出しフェーズ：先頭ノードへ戻る矢印（9ノード分、縦に長い）
+  extractionLoop: {
+    bulge: 130,
+    ctrl1Ratio: 0.12,
+    ctrl2Ratio: 0.88,
+  },
+  // OK分岐：検査ノードから格納ノードまで右側を迂回する矢印
+  decisionBranch: {
+    bulge: 50,
+    ctrl1Ratio: 0.1,
+    ctrl2Ratio: 0.9,
+  },
+}
+
+/**
+ * 縦方向に離れた2点を、左右どちらかに膨らむベジェ曲線でつなぐパスを生成します。
+ * direction: -1 = 左に膨らむ（戻りループ用）, 1 = 右に膨らむ（OK分岐用）
+ */
+function bulgeLoopPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
+  cfg: { bulge: number; ctrl1Ratio: number; ctrl2Ratio: number },
+  direction: -1 | 1
+) {
+  const dx = cfg.bulge * direction
+  const c1y = startY + (endY - startY) * cfg.ctrl1Ratio
+  const c2y = startY + (endY - startY) * cfg.ctrl2Ratio
+  return `M ${startX} ${startY} C ${startX + dx} ${c1y}, ${endX + dx} ${c2y}, ${endX} ${endY}`
+}
 
 function buildLayout() {
-  const title1Y = TITLE_GAP - 12
+  const title1Y = TITLE_GAP - 20
   const settingNodes = SETTING_FLOW.map((n, i) => ({ ...n, y: TITLE_GAP + i * STEP }))
   const settingBottom = settingNodes[settingNodes.length - 1].y + BOX_H
 
@@ -67,11 +127,18 @@ function buildLayout() {
   const lastNode = extractionNodes[extractionNodes.length - 1]
   const totalH = lastNode.y + BOX_H + 44
 
-  return { title1Y, settingNodes, settingBottom, dividerY, title2Y, extractionStartY, extractionNodes, lastNode, totalH }
+  // 左右のループ矢印（bulge）がSVGの外にはみ出て途切れないよう、
+  // LOOP_CONFIGの値に応じてviewBoxの余白を自動計算する。
+  // bulgeの数値をどれだけ大きくしても、ここで自動的に描画エリアが広がる。
+  const maxLeftBulge = Math.max(LOOP_CONFIG.settingLoop.bulge, LOOP_CONFIG.extractionLoop.bulge)
+  const leftExtra = Math.max(0, maxLeftBulge - MARGIN_X + 15)
+  const rightExtra = Math.max(90, LOOP_CONFIG.decisionBranch.bulge + 60)
+
+  return { title1Y, settingNodes, settingBottom, dividerY, title2Y, extractionStartY, extractionNodes, lastNode, totalH, leftExtra, rightExtra }
 }
 
-export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleTotal }: JobFlowDiagramProps) {
-  const { title1Y, settingNodes, settingBottom, dividerY, title2Y, extractionNodes, lastNode, totalH } = buildLayout()
+export default function JobFlowDiagram({theme, activeStep, cycleCurrent, cycleTotal, colorOverrides, }: JobFlowDiagramProps) {
+  const { title1Y, settingNodes, settingBottom, dividerY, title2Y, extractionNodes, lastNode, totalH, leftExtra, rightExtra } = buildLayout()
   const cx = MARGIN_X + BOX_W / 2
 
   const hasCurrent = typeof cycleCurrent === 'number'
@@ -80,9 +147,9 @@ export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleT
   const cycleCurrentLabel = hasCurrent ? cycleCurrent : '--'
   const cycleTotalLabel = hasTotal ? cycleTotal : '--'
 
-  const renderBox = (n: { id: string; jobId?: string; label: string; kind?: 'decision'; plcStep?: number; y: number }) => {
+ const renderBox = (n: { id: string; jobId?: string; label: string; kind?: 'decision'; plcStep?: number; y: number }) => {
     const job = n.jobId ? JOB_MAP[n.jobId] : undefined
-    const fill = job ? job.color : theme.border
+     const fill = job ? (colorOverrides?.[n.jobId!] ?? job.color) : theme.border
     const isActive = n.plcStep !== undefined && activeStep !== undefined && n.plcStep === activeStep
     const strokeColor = isActive ? theme.accent : fill
     const groupClass = isActive ? 'flow__node flow__node--active' : 'flow__node'
@@ -91,9 +158,9 @@ export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleT
       const cyD = n.y + BOX_H / 2
       const w = BOX_W - 12
       const points = [
-        [cx, n.y - 2],
+        [cx, n.y - DIAMOND_TOP_INSET],
         [cx + w / 2, cyD],
-        [cx, n.y + BOX_H + 2],
+        [cx, n.y + BOX_H + DIAMOND_BOTTOM_INSET],
         [cx - w / 2, cyD],
       ].map((p) => p.join(',')).join(' ')
       return (
@@ -108,7 +175,7 @@ export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleT
             />
           )}
           <polygon points={points} fill={theme.surface} stroke={strokeColor} strokeWidth={isActive ? 4 : 1.5} />
-          <text x={cx} y={cyD} dominantBaseline="middle" textAnchor="middle" className="flow__label" fill={theme.subtext}>
+          <text x={cx-3} y={cyD+5} dominantBaseline="middle" textAnchor="middle" className="flow__label" fill={theme.subtext}>
             {n.label}
           </text>
         </g>
@@ -144,7 +211,7 @@ export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleT
   }
 
   const arrowDown = (fromY: number, toY: number, key: string) => (
-    <line key={key} x1={cx} y1={fromY} x2={cx} y2={toY} stroke={theme.border} strokeWidth={2.5} markerEnd="url(#flow-arrow)" />
+    <line key={key} x1={cx+220} y1={fromY} x2={cx+220} y2={toY} stroke={theme.accent} strokeWidth={2.5} markerEnd="url(#flow-arrow)" />
   )
 
   return (
@@ -167,7 +234,7 @@ export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleT
 
       <svg
         className="flow-diagram"
-        viewBox={`0 0 ${MARGIN_X * 2 + BOX_W + 90} ${totalH}`}
+        viewBox={`${-leftExtra} 0 ${leftExtra + MARGIN_X * 2 + BOX_W + rightExtra} ${totalH}`}
         preserveAspectRatio="xMidYMin meet"
       >
         <defs>
@@ -187,10 +254,14 @@ export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleT
           </g>
         ))}
 
-        {/* セッティング先頭へ戻るループ矢印 */}
+        {/* セッティング先頭へ戻るループ矢印（LOOP_CONFIG.settingLoop で調整） */}
         <path
-          d={`M ${MARGIN_X} ${settingBottom - BOX_H / 2} C ${MARGIN_X - 24} ${settingBottom - BOX_H}, ${MARGIN_X - 24} ${settingNodes[0].y}, ${MARGIN_X} ${settingNodes[0].y + BOX_H / 2}`}
-          fill="none" stroke={theme.border} strokeWidth={2.5} strokeDasharray="4 3" markerEnd="url(#flow-arrow)"
+          d={bulgeLoopPath(
+            MARGIN_X - 1, settingBottom - BOX_H / 2,
+            MARGIN_X, settingNodes[0].y + BOX_H / 2,
+            LOOP_CONFIG.settingLoop, -1
+          )}
+          fill="none" stroke={theme.accent} strokeWidth={3.5} strokeDasharray="12 6" markerEnd="url(#flow-arrow)"
         />
 
         {/* フェーズ間の連結線（矢印は最後だけ／区切りテキストとタイトルはこの上に重ねて表示） */}
@@ -211,28 +282,40 @@ export default function JobFlowDiagram({ theme, activeStep, cycleCurrent, cycleT
             return (
               <g key={n.id}>
                 {renderBox(n)}
-                {arrowDown(n.y + BOX_H + 6, next.y, `${n.id}-ng`)}
-                <text x={cx + 22} y={n.y + BOX_H + 38} dominantBaseline="hanging" className="flow__branch-label" fill={theme.subtext}>NG</text>
+                {arrowDown(n.y + BOX_H + DIAMOND_BOTTOM_INSET + DECISION_ARROW_CONFIG.outGap, next.y, `${n.id}-ng`)}
+                <text x={cx + 235} y={n.y + BOX_H - 20} dominantBaseline="hanging" className="flow__branch-label" fill={theme.subtext}>NG</text>
+                {/* OK分岐：格納ノードまで右側を迂回（LOOP_CONFIG.decisionBranch で調整） */}
                 <path
-                  d={`M ${cx + (BOX_W - 12) / 2} ${n.y + BOX_H / 2} C ${MARGIN_X + BOX_W + 20} ${n.y}, ${MARGIN_X + BOX_W + 40} ${lastNode.y}, ${cx + BOX_W / 2} ${lastNode.y + BOX_H / 2}`}
+                  d={bulgeLoopPath(
+                    cx + (BOX_W - 12) / 2, n.y + BOX_H / 2,
+                    cx + BOX_W / 2, lastNode.y + BOX_H / 2,
+                    LOOP_CONFIG.decisionBranch, 1
+                  )}
                   fill="none" stroke={theme.accent} strokeWidth={2.5} markerEnd="url(#flow-arrow)"
                 />
-                <text x={MARGIN_X + BOX_W + 32} y={(n.y + lastNode.y) / 2 - 28} dominantBaseline="middle" className="flow__branch-label" fill={theme.accent}>OK</text>
+                <text x={MARGIN_X + BOX_W + 50} y={(n.y + lastNode.y) / 2 - 28} dominantBaseline="middle" className="flow__branch-label" fill={theme.accent}>OK</text>
               </g>
             )
           }
+          const arrowEndY = next.kind === 'decision'
+            ? next.y - DIAMOND_TOP_INSET + DECISION_ARROW_CONFIG.intoGap
+            : next.y
           return (
             <g key={n.id}>
               {renderBox(n)}
-              {arrowDown(n.y + BOX_H, next.y, `${n.id}-arrow`)}
+              {arrowDown(n.y + BOX_H, arrowEndY, `${n.id}-arrow`)}
             </g>
           )
         })}
 
-        {/* 取出しフェーズ先頭へ戻るループ矢印 */}
+        {/* 取出しフェーズ先頭へ戻るループ矢印（LOOP_CONFIG.extractionLoop で調整） */}
         <path
-          d={`M ${MARGIN_X} ${lastNode.y + BOX_H / 2} C ${MARGIN_X - 20} ${lastNode.y}, ${MARGIN_X - 20} ${extractionNodes[0].y}, ${MARGIN_X} ${extractionNodes[0].y + BOX_H / 2}`}
-          fill="none" stroke={theme.border} strokeWidth={2.5} strokeDasharray="4 3" markerEnd="url(#flow-arrow)"
+          d={bulgeLoopPath(
+            MARGIN_X - 3, lastNode.y + BOX_H / 2,
+            MARGIN_X + 1, extractionNodes[0].y + BOX_H / 2,
+            LOOP_CONFIG.extractionLoop, -1
+          )}
+          fill="none" stroke={theme.accent} strokeWidth={3.5} strokeDasharray="12 6" markerEnd="url(#flow-arrow)"
         />
 
         {/* 全刃セット完了後、①へ戻る大きなループ */}

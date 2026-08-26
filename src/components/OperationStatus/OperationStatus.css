@@ -1,93 +1,453 @@
 .op-status__layout {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  align-items: stretch;
 }
 
-.op-status__row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.op-status__layout.is-editing {
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.op-status__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
 }
 
-.op-status__card,
-.op-status__full {
+/* ---- サイクルタイム（左上にコンパクト表示） ---- */
+.op-status__cycle-corner {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   background: var(--bg-panel);
   border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  padding: 16px;
-}
-
-.op-status__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
-/* ロボット速度・トルク（数値表示） */
-.robot-status {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.robot-status__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 14px 8px;
   border-radius: 10px;
-  background: var(--bg-inset, rgba(255, 255, 255, 0.04));
+  padding: 8px 14px;
 }
 
-.robot-status__label {
+.op-status__title--inline {
+  margin-bottom: 0;
   font-size: 12px;
-  color: var(--text-secondary, #9aa4b2);
+  letter-spacing: 0.4px;
+  white-space: nowrap;
 }
 
-.robot-status__value {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.robot-status__value--speed {
-  color: #00d2ff;
-}
-
-.robot-status__value--torque {
-  color: #ffb000;
-}
-
-.robot-status__unit {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary, #9aa4b2);
-}
-
-/* サイクルタイム（A・B合算・数値表示） */
 .cycle-time {
   display: flex;
+  flex-direction: row;
   align-items: baseline;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 0;
+  gap: 4px;
+  padding: 0;
 }
 
 .cycle-time__value {
-  font-size: 40px;
+  font-size: 30px;
   font-weight: 700;
   line-height: 1;
   color: #00c853;
 }
 
 .cycle-time__unit {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-secondary, #9aa4b2);
+}
+
+/* ---- ロボットA/Bカード ---- */
+.op-status__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.op-status__card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.op-status__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+/* ===== RobotJointCallout: 自由配置キャンバス ===== */
+
+.robot-callout {
+  position: relative;
+  width: 100%;
+  min-height: 700px;
+}
+
+.robot-callout__image {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 62%;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-inset, rgba(255, 255, 255, 0.04));
+}
+
+.robot-callout__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.robot-callout__image-placeholder {
+  font-size: 11px;
+  color: var(--text-secondary, #9aa4b2);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+/* 軸マーカー（画像上の丸ラベル・自由配置） */
+.robot-callout__dot {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: rgba(0, 210, 255, 0.16);
+  border: 1.5px solid #00d2ff;
+  color: #00d2ff;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, box-shadow 0.15s;
+  touch-action: none;
+  user-select: none;
+}
+
+.robot-callout__dot.is-active {
+  background: rgba(0, 210, 255, 0.35);
+}
+
+.robot-callout.is-editing .robot-callout__dot.is-draggable {
+  cursor: grab;
+}
+.robot-callout.is-editing .robot-callout__dot.is-draggable:active {
+  cursor: grabbing;
+}
+
+/* 速度・トルクを1セットにしたチップ（自由配置） */
+.robot-callout__chip {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: var(--bg-inset, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 8px 14px;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  touch-action: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.robot-callout.is-editing .robot-callout__chip.is-draggable {
+  cursor: grab;
+}
+.robot-callout.is-editing .robot-callout__chip.is-draggable:active {
+  cursor: grabbing;
+}
+
+/* 選択中：iPhone風のすりガラス表現 */
+.robot-callout__chip.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.robot-callout__chip-label {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.robot-callout__chip-vals {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 3段構成：速度とトルクを別行に */
+.robot-callout__chip--row3 .robot-callout__chip-vals {
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.robot-callout__chip-val {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 24px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.robot-callout__chip-val--speed {
+  color: #00d2ff;
+}
+
+.robot-callout__chip-val--torque {
+  color: #ffb000;
+}
+
+.robot-callout__chip-unit {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #9aa4b2);
+}
+
+.robot-callout__empty {
+  font-size: 15px;
+  color: var(--text-secondary, #9aa4b2);
+  padding: 12px;
+}
+
+/* 引き出し線（軸マーカー → チップ） */
+.robot-callout__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.robot-callout__svg path {
+  fill: none;
+  stroke: #00d2ff;
+  stroke-width: 1.1;
+  stroke-dasharray: 2.5 3;
+  opacity: 0.55;
+}
+
+.robot-callout__svg path.is-active {
+  opacity: 1;
+  stroke-width: 1.6;
+  stroke-dasharray: none;
+}
+
+/* ===== 編集パネル（RobotArmDashboardと同じ構成パターン） ===== */
+
+.op-status__edit-panel {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-soft);
+  border-radius: 0 12px 12px 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.op-status__edit-panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.op-status__panel-section {
+  margin-bottom: 24px;
+}
+
+.op-status__panel-section h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.op-status__edit-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.op-status__chip-opt {
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #9aa4b2);
+  cursor: pointer;
+}
+
+.op-status__chip-opt.is-active {
+  border-color: #00d2ff;
+  color: var(--text-primary);
+  font-weight: 600;
+  background: rgba(0, 210, 255, 0.08);
+}
+
+.op-status__axis-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+}
+
+.op-status__axis-row-label {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.op-status__axis-reset {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #9aa4b2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.op-status__reset-all {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #9aa4b2);
+  cursor: pointer;
+}
+
+.op-status__panel-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-secondary, #9aa4b2);
+  line-height: 1.5;
+}
+
+/* 狭幅対応：自由配置は解除して1列スタックに戻す */
+@media (max-width: 720px) {
+  .op-status__layout.is-editing {
+    flex-direction: column;
+  }
+
+  .op-status__edit-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border-soft);
+    border-radius: 12px;
+  }
+
+  .op-status__row {
+    grid-template-columns: 1fr;
+  }
+
+  .robot-callout {
+    min-height: 0;
+  }
+
+  .robot-callout__image {
+    position: static;
+    transform: none;
+    width: 100%;
+    margin: 0 auto 10px;
+  }
+
+  .robot-callout__dot {
+    display: none; /* 狭幅では画像上マーカーの意味が薄いため非表示 */
+  }
+
+  .robot-callout__chip {
+    position: static;
+    transform: none;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 6px;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .robot-callout__chip--row3 .robot-callout__chip-vals {
+    flex-direction: row;
+  }
+
+  .robot-callout__svg {
+    display: none;
+  }
+}
+
+/* ---- タイトル：編集モード中はクリックで編集対象を切り替え可能 ---- */
+.op-status__title--selectable {
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px 8px;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.op-status__title--selectable:hover {
+  background: var(--bg-inset, rgba(255, 255, 255, 0.04));
+}
+
+.op-status__title--selectable.is-selected {
+  color: #00d2ff;
+  background: rgba(0, 210, 255, 0.08);
+}
+
+/* ---- 編集パネル：A/B切り替えタブ ---- */
+.op-status__robot-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.op-status__robot-tab {
+  flex: 1;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #9aa4b2);
+  cursor: pointer;
+}
+
+.op-status__robot-tab.is-active {
+  border-color: #00d2ff;
+  color: var(--text-primary);
+  font-weight: 600;
+  background: rgba(0, 210, 255, 0.08);
 }

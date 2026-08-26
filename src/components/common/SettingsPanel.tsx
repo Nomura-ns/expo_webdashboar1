@@ -8,15 +8,17 @@ type Props = {
   intervalSec: number
   isPlaying: boolean
   isEditing: boolean
+  isNameplatePage: boolean       // 追加：銘板ページを開いているか
   onThemeChange: (key: ThemeKey) => void
   onIntervalChange: (value: number) => void
   onPlayingChange: (value: boolean) => void
   onEditingChange: (value: boolean) => void
+  onOpenAdmin: () => void        // 追加：作成者専用ページを開く
 }
 
 export default function SettingsPanel({
-  theme, themeKey, isEditing,
-  onThemeChange, onEditingChange,
+  theme, themeKey, isEditing, isNameplatePage,
+  onThemeChange, onEditingChange, onOpenAdmin,
 }: Props) {
   const isMobile = useIsMobile() 
 
@@ -34,57 +36,87 @@ export default function SettingsPanel({
     }}>
       <p style={{ fontSize: '20px', fontWeight: 'bold', color: theme.accent, margin: 0 }}>設定</p>
 
-      {/* 編集モード切替スイッチ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px' }}>
-        <span style={{ width: '80px', fontSize: '16px', color: theme.text }}>編集モード</span>
-        <label
-          style={{
-            position: 'relative',
-            display: 'inline-block',
-            width: '44px',
-            height: '24px',
-            flexShrink: 0,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={isEditing}
-            onChange={(e) => onEditingChange(e.target.checked)}
-            style={{ opacity: 0, width: 0, height: 0 }}
-          />
-          <span
+      {isNameplatePage ? (
+        /* 銘板ページ表示中：編集モードの代わりに作成者専用ページへのボタンを表示 */
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px' }}>
+          <span style={{ width: '80px', fontSize: '16px', color: theme.text }}>作成者専用</span>
+          <button
+            onClick={onOpenAdmin}
+            aria-label="作成者用ページを開く"
+            title="作成者用ページ"
             style={{
-              position: 'absolute',
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              border: `1px solid ${theme.border}`,
+              background: 'transparent',
+              color: theme.text,
+              fontSize: '14px',
               cursor: 'pointer',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: isEditing ? theme.accent : '#ccc',
-              borderRadius: '24px',
-              transition: '0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'border-color 0.15s ease, opacity 0.15s ease',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = theme.accent }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = theme.border }}
+          >
+            🔒
+          </button>
+        </div>
+      ) : (
+        /* 編集モード切替スイッチ（銘板ページ以外） */
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px' }}>
+          <span style={{ width: '80px', fontSize: '16px', color: theme.text }}>編集モード</span>
+          <label
+            style={{
+              position: 'relative',
+              display: 'inline-block',
+              width: '44px',
+              height: '24px',
+              flexShrink: 0,
             }}
           >
+            <input
+              type="checkbox"
+              checked={isEditing}
+              onChange={(e) => onEditingChange(e.target.checked)}
+              style={{ opacity: 0, width: 0, height: 0 }}
+            />
             <span
               style={{
                 position: 'absolute',
-                height: '18px',
-                width: '18px',
-                left: isEditing ? '23px' : '3px',
-                bottom: '3px',
-                backgroundColor: '#fff',
-                borderRadius: '50%',
+                cursor: 'pointer',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: isEditing ? theme.accent : '#ccc',
+                borderRadius: '24px',
                 transition: '0.2s',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
               }}
-            />
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  height: '18px',
+                  width: '18px',
+                  left: isEditing ? '23px' : '3px',
+                  bottom: '3px',
+                  backgroundColor: '#fff',
+                  borderRadius: '50%',
+                  transition: '0.2s',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
+                }}
+              />
+            </span>
+          </label>
+          <span style={{ fontSize: '13px', color: theme.text }}>
+            {isEditing ? 'ON' : 'OFF'}
+            
           </span>
-        </label>
-        <span style={{ fontSize: '13px', color: theme.text }}>
-          {isEditing ? 'ON' : 'OFF'}
-        </span>
-      </div>
-
+        </div>
+      )}
 
       {/* テーマ */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? '8px' : '16px' }}>

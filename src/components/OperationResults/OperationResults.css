@@ -3,7 +3,7 @@
   flex: 1;
   min-height: 0;
   gap: 6px;
-  align-items: stretch; /* ← flex-start から変更：子要素が高さいっぱいまで伸びるように */
+  align-items: flex-start;
 }
 
 .op-results__body.is-editing {
@@ -16,6 +16,7 @@
   min-height: 0;
   align-self: stretch;
   display: flex;
+  
 }
 
 .op-results__chart {
@@ -29,6 +30,7 @@
   flex: 0 0 auto;
   min-width: 340px;
   min-height: 0;
+  height: 790px;
   overflow: hidden;
   display: flex;
   justify-content: center;
@@ -109,4 +111,97 @@
   height: 9px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+
+/* ===== タブ切換 ===== */
+.op-results__tabs {
+  display: inline-flex;
+  gap: 2px;
+  margin: 4px 0 6px;
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.op-results__tab {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.op-results__tab.is-active {
+  font-weight: bold;
+}
+
+/* ===== 色編集 ===== */
+
+.op-results__color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.op-results__color-row-label {
+  font-size: 13px;
+}
+
+.op-results__color-input {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.op-results__color-reset {
+  margin-top: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  align-self: flex-start;
+}
+/* ===== 円グラフの大きさ操作 ===== */
+
+.op-results__hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.op-results__size-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.op-results__size-btn {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.op-results__size-input {
+  width: 60px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  text-align: center;
+  font-size: 13px;
 }

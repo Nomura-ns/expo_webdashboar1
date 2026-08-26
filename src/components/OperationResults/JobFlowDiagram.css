@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
+  height: 98%;
   min-width: 240px;
   min-height: 0;
 }
@@ -32,7 +32,7 @@
 
 .flow-diagram-wrap__progress-bar {
   flex: 1;
-  height: 6px;
+  height: 8px;
   border-radius: 3px;
   overflow: hidden;
 }
@@ -46,16 +46,16 @@
 .flow-diagram {
   flex: 1;
   width: 100%;
-  height: 100%;
+  height: 92%;
   min-width: 240px;
   min-height: 0;
 }
 
 .flow__title { font-size: 32px; font-weight: 700; font-family: var(--font-mono); }
-.flow__label { font-size: 92px; font-family: var(--font-mono); }
-.flow__robot { font-size: 36px; font-weight: 700; font-family: var(--font-mono); }
-.flow__divider { font-size: 42px; font-family: var(--font-mono); }
-.flow__branch-label { font-size: 32px; font-family: var(--font-mono); font-weight: 700; }
+.flow__label { font-size: 75px; font-family: var(--font-mono); }
+.flow__robot { font-size: 32px; font-weight: 700; font-family: var(--font-mono); }
+.flow__divider { font-size: 35px; font-family: var(--font-mono); }
+.flow__branch-label { font-size: 50px; font-family: var(--font-mono); font-weight: 700; }
 
 /* アクティブ工程の強調表示 */
 .flow__node--active rect,
@@ -68,8 +68,8 @@
 }
 
 @keyframes flow-pulse {
-  0%, 100% { stroke-width: 3.5; }
-  50% { stroke-width: 6; }
+  0%, 100% { stroke-width: 2; }
+  50% { stroke-width: 4; }
 }
 
 @keyframes flow-glow {

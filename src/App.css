@@ -214,12 +214,13 @@ body {
 
 /* ダッシュボード */
 .dashboard-page {
-  padding: 24px;
+  padding: 35px;
+  box-sizing: border-box;
+  width: 100%;
+  flex: 1;        
+  min-height: 0;  
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  box-sizing: border-box;
 }
 
 .status-bar {
@@ -241,6 +242,8 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
   width: 100%;
+  flex: 1;        /* ← 追加：親の残り高さを埋める */
+  min-height: 0;  /* ← 追加：グリッドが内容に合わせて伸びすぎず、縮められるようにする */
 }
 
 .panel-card {

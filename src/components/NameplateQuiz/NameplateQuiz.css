@@ -14,7 +14,7 @@
     'side media'
     'side choices';
   gap: clamp(12px, 2vw, 24px);
-  width: 100%;
+  width: 97%;
   height: 100%;
   min-height: 0;
 }
@@ -56,7 +56,7 @@
 
 .nameplate-quiz__ring-value {
   font-family: var(--font-mono);
-  font-size: 50px; 
+  font-size: 40px; 
   font-weight: 800;
   fill: var(--nq-accent, #38bdf8);
 }
@@ -118,6 +118,29 @@
   color: var(--nq-text, #f1f5f9);
 }
 
+/* ---- 作成者用ページ入口（鍵アイコン） ---- */
+.nameplate-quiz__admin-trigger {
+  margin-top: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--nq-border, #245d9b);
+  background: var(--nq-surface, #23274f);
+  color: var(--nq-subtext, #94a3b8);
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.nameplate-quiz__admin-trigger:hover {
+  opacity: 1;
+  border-color: var(--nq-accent, #38bdf8);
+}
+
 /* ---- 右上：動画エリア（画面に合わせて拡大） ---- */
 .nameplate-quiz__media {
   grid-area: media;
@@ -126,8 +149,8 @@
   justify-content: center;
   min-height: 0;
   min-width: 0;
-  width: 100%;
-  height: 100%;
+  width: 105%;
+  height: 90%;
   border: 1px solid var(--nq-border, #245d9b);
   border-radius: 6px;
   background: var(--nq-surface, #23274f);
@@ -136,9 +159,14 @@
 }
 
 .nameplate-quiz__video {
+  position: static;              /* absolute配置をやめる */
   width: 100%;
-  height: 100%;
-  object-fit: contain;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 55%;               /* 動画エリアの上限 */
+  object-fit: contain;           /* トリミングせず全体を表示 */
+  background: #000;
+  border-radius: 4px;
 }
 
 .nameplate-quiz__media-placeholder {
@@ -146,7 +174,8 @@
   color: var(--nq-subtext, #94a3b8);
 }
 
-/* ---- 下段：問題1〜4 タブボタン ---- */
+
+/* ---- 下段：問題1〜4 タブボタン（未使用の場合は非表示でも可） ---- */
 .nameplate-quiz__choices {
   grid-area: choices;
   display: grid;
@@ -177,7 +206,7 @@
   background: color-mix(in srgb, var(--nq-accent, #38bdf8) 10%, var(--nq-surface, transparent));
 }
 
-/* ---- 問題表示ON/OFFボタン ---- */
+/* ---- 問題表示ON/OFFボタン、わからない/次へ共通スタイル ---- */
 .nameplate-quiz__toggle-btn {
   margin-top: 4px;
   font-size: clamp(14px, 1.1vw, 18px);
@@ -191,9 +220,14 @@
   transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.nameplate-quiz__toggle-btn:hover {
+.nameplate-quiz__toggle-btn:hover:not(:disabled) {
   border-color: var(--nq-accent, #38bdf8);
   color: var(--nq-text, #f1f5f9);
+}
+
+.nameplate-quiz__toggle-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
 }
 
 .nameplate-quiz__toggle-btn.is-on {
@@ -202,17 +236,30 @@
   background: color-mix(in srgb, var(--nq-accent, #38bdf8) 12%, var(--nq-surface, transparent));
 }
 
-/* ---- 問題表示ビュー（動画エリア内に表示） ---- */
-.nameplate-quiz__question-view {
+/* ---- 問題表示ビュー／正誤判定ビュー（動画エリア内に表示） ---- */
+.nameplate-quiz__question-view,
+.nameplate-quiz__answer-view {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-start;   /* 上から詰めて配置 */
+  gap: clamp(8px, 1.2vw, 14px);
+  width: 90%;
+  height: 85%;
+  padding: clamp(10px, 1.8vw, 20px);
+  z-index: 1;
+  overflow-y: auto;              /* 万一入りきらない時は縦スクロールで救済 */
+}
+
+/* 動画の上に文字が乗るので、下側だけ暗くして視認性を確保 */
+.nameplate-quiz__question-view::before,
+.nameplate-quiz__answer-view::before {
+  content: none;
+}
+
+.nameplate-quiz__answer-view {
   justify-content: center;
-  gap: clamp(14px, 2vw, 26px);
-  width: 100%;
-  height: 100%;
-  padding: clamp(16px, 2.5vw, 32px);
 }
 
 .nameplate-quiz__question-icon {
@@ -221,12 +268,23 @@
   object-fit: contain;
 }
 
+.nameplate-quiz__question-icon-inline {
+  height: 1.5em;           /* 親（.nameplate-quiz__question-text）の font-size に連動して拡縮 */
+  width: auto;
+  max-width: none;
+  vertical-align: -0.35em; /* テキストのベースラインに合わせる微調整 */
+  margin-right: 0.25em;
+  object-fit: contain;
+  display: inline-block;
+}
+
 .nameplate-quiz__question-text {
-  font-size: clamp(90px, 2.2vw, 32px);
+  font-size: clamp(18px, 2.2vw, 32px);
   font-weight: 600;
   color: var(--nq-text, #f1f5f9);
   text-align: center;
   margin: 0;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
 .nameplate-quiz__question-choices {
@@ -239,21 +297,141 @@
 
 .nameplate-quiz__question-choice {
   text-align: center;
-  font-size: clamp(18px, 1.6vw, 24px);
+  font-size: clamp(15px, 1.6vw, 22px);
   font-weight: 500;
   color: var(--nq-subtext, #94a3b8);
-  background: var(--nq-surface, #23274f);
+  background: color-mix(in srgb, var(--nq-surface, #23274f) 85%, transparent);
   border: 1px solid var(--nq-border, #245d9b);
   border-radius: 6px;
   padding: clamp(10px, 1.2vw, 16px) 12px;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.nameplate-quiz__question-choice--unknown {
+  grid-column: span 2;
+}
+
+.nameplate-quiz__question-choice--clickable {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.nameplate-quiz__question-choice--clickable:hover {
+  border-color: var(--nq-accent, #38bdf8);
+  color: var(--nq-text, #f1f5f9);
+  background: var(--nq-surface, #23274f);
+}
+
+.nameplate-quiz__question-choice--clickable:active {
+  transform: scale(0.98);
+}
+
+/* ---- クイズ開始前 ---- */
+.nameplate-quiz__start-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+}
+
+.nameplate-quiz__start-desc {
+  font-size: clamp(14px, 1.4vw, 18px);
+  color: var(--nq-subtext, #94a3b8);
+  margin: 0;
+}
+
+.nameplate-quiz__start-btn {
+  font-size: clamp(16px, 1.6vw, 22px);
+  font-weight: 700;
+  color: #fff;
+  background: var(--nq-accent, #38bdf8);
+  border: none;
+  border-radius: 999px;
+  padding: 14px 40px;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.1s ease;
+}
+
+.nameplate-quiz__start-btn:hover {
+  filter: brightness(1.1);
+}
+
+.nameplate-quiz__start-btn:active {
+  transform: scale(0.98);
+}
+
+.nameplate-quiz__question-choice.is-selected {
+  border-color: var(--nq-accent, #38bdf8);
+  color: var(--nq-accent, #38bdf8);
+}
+
+.nameplate-quiz__question-choice.is-correct-answer {
+  border-color: #22c55e;
+  color: #22c55e;
+  background: color-mix(in srgb, #22c55e 15%, color-mix(in srgb, var(--nq-surface, #23274f) 85%, transparent));
+}
+
+.nameplate-quiz__question-choice.is-wrong-answer {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 15%, color-mix(in srgb, var(--nq-surface, #23274f) 85%, transparent));
+}
+
+/* ---- 解説文 ---- */
+.nameplate-quiz__explanation {
+  font-size: clamp(13px, 1.3vw, 17px);
+  color: var(--nq-text, #f1f5f9);
+  text-align: center;
+  max-width: 560px;
+  margin: 0;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+.nameplate-quiz__answer-actions {
+  display: flex;
+  gap: 14px;
+}
+
+/* ---- 最終スコア画面 ---- */
+.nameplate-quiz__final-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 100%;
+}
+
+.nameplate-quiz__final-title {
+  font-size: clamp(16px, 1.6vw, 22px);
+  color: var(--nq-subtext, #94a3b8);
+  margin: 0;
+}
+
+.nameplate-quiz__final-score {
+  font-family: var(--font-mono);
+  font-size: clamp(28px, 3.2vw, 44px);
+  font-weight: 800;
+  color: var(--nq-text, #f1f5f9);
+  margin: 0;
+}
+
+.nameplate-quiz__final-score span {
+  color: var(--nq-accent, #38bdf8);
+}
+
+.nameplate-quiz__final-rate {
+  font-size: clamp(15px, 1.5vw, 20px);
+  color: var(--nq-subtext, #94a3b8);
+  margin: 0 0 8px;
 }
 
 /* ---- 正誤オーバーレイ ---- */
 .nameplate-quiz__result {
-  position: absolute;
-  top: clamp(10px, 1.5vw, 20px);
-  left: 50%;
-  transform: translateX(-50%);
   font-size: clamp(24px, 2.4vw, 36px);
   font-weight: 800;
   padding: 6px 24px;
@@ -345,4 +523,39 @@
 .nameplate-quiz__timer-count.is-urgent {
   color: #f87171;
   animation: nameplate-quiz-timer-pulse 0.6s ease-in-out infinite;
+}
+
+@keyframes nameplate-quiz-timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (max-width: 768px) {
+  .panel-frame__body {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;               /* ← 高さを自動調整 */
+    max-height: calc(95vh - 120px); /* ← 上部パネル分を差し引いた高さ */
+    overflow-y: auto;           /* ← 縦スクロールを許可 */
+    overflow-x: hidden;         /* ← 横スクロール禁止 */
+    box-sizing: border-box;
+    padding: 12px 14px;         /* ← モバイル用に圧縮 */
+  }
+  .panel-frame.nameplate-quiz {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: calc(100vh - 110px); /* 上部パネル(sec1)の高さを差し引く */
+    overflow-y: auto;                /* 縦スクロール許可 */
+    overflow-x: hidden;              /* 横スクロール禁止 */
+    padding: 12px 14px;
+    box-sizing: border-box;
+  }
+}
+
+.nameplate-quiz__layout.is-mobile {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    'media'
+    'choices';
 }

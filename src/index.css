@@ -7,7 +7,8 @@ body {
   width: 100%;
   max-width: 100%;
   margin: 0 auto;
-  min-height: 100svh;
+  min-height: 0;
+  height: auto;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -81,12 +82,13 @@ body {
 
 /* --- ダッシュボード --- */
 .dashboard-page {
-  padding: 35px;
+  padding: 5px 35px 35px;
   box-sizing: border-box;
   width: 100%;
-  height: calc(100svh - 56px); /* 56px は app-header のおおよその高さ。実測値に調整してください */
+  height: calc(100svh - 50px); /* 背景パネルの高さ(全ﾍﾟｰｼ共通) */
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .status-bar {

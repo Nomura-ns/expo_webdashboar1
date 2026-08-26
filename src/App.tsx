@@ -1,27 +1,14 @@
 import { useState, useRef, useEffect } from 'react'
-import type {
-  ThemeKey,
-  PageKey,
-  JobSeries,
-  NameplateQuestion,
-  QuizStats,
-} from './types'
-import { THEMES, PAGES } from './components/common/themes'
+import type { ThemeKey, PageKey, JobSeries, NameplateQuestion } from './types'
+import { THEMES, PAGES, getThemeMode } from './components/common/themes'
 import Sidebar from './components/common/Sidebar'
 import SettingsPanel from './components/common/SettingsPanel'
-import OperationResults from './components/OperationResults/OperationResults'
+import OperationResults, { type MetricPoint } from './components/OperationResults/OperationResults'
 import RobotArmDashboard from './components/RobotArmDashboard/RobotArmDashboard'
 import OperationStatus from './components/OperationStatus/OperationStatus'
 import NameplateQuiz from './components/NameplateQuiz/NameplateQuiz'
-import { getThemeMode } from './components/common/themes'
 import { usePlcWebSocket } from './hooks/usePlcWebSocket' 
-import { usePlcQuizSignals, QUIZ_QUESTION_ADDRESS, QUIZ_RESULT_ADDRESS }  from './hooks/usePlcQuizsignals' 
-import {
-  usePlcJobFlowSignals,
-  JOB_FLOW_STEP_ADDRESS,
-  JOB_FLOW_CYCLE_CURRENT_ADDRESS,
-  JOB_FLOW_CYCLE_TOTAL_ADDRESS,
-} from './hooks/usePlcJobFlowSignals'
+import { usePlcJobFlowSignals, JOB_FLOW_STEP_ADDRESS, JOB_FLOW_CYCLE_CURRENT_ADDRESS, JOB_FLOW_CYCLE_TOTAL_ADDRESS,} from './hooks/usePlcJobFlowSignals'
 import { JOB_DEFINITIONS } from './config/jobDefinitions'
 
 // サンプルデータ（実際はAPIやpropsから取得）
@@ -41,6 +28,20 @@ const SAMPLE_COUNTS: Record<string, number[]> = {
   'ring-spring':   [3, 4, 2, 5, 4],
 }
 
+// 刃物交換・検査結果（OK/NG）用サンプルデータ
+const SAMPLE_METRICS: Record<'bladeChangeCount' | 'ngCount' | 'okCount', number[]> = {
+  bladeChangeCount: [2, 1, 3, 2, 1],
+  ngCount:          [5, 3, 7, 4, 2],
+  okCount:          [118, 132, 96, 145, 151],
+}
+
+const sampleMetrics: MetricPoint[] = DATES.map((date, i) => ({
+  date,
+  bladeChangeCount: SAMPLE_METRICS.bladeChangeCount[i] ?? 0,
+  ngCount: SAMPLE_METRICS.ngCount[i] ?? 0,
+  okCount: SAMPLE_METRICS.okCount[i] ?? 0,
+}))
+
 const sampleSeries: JobSeries[] = JOB_DEFINITIONS.map((def) => ({
   jobId: def.id,
   jobName: def.jobName,
@@ -56,65 +57,108 @@ const sampleSeries: JobSeries[] = JOB_DEFINITIONS.map((def) => ({
 
 // 稼働状況（anomalyページ）用のサンプルデータ
 // ロボットA/Bは直近の速度・トルクの数値のみ（グラフ表示はしない）
-const robotA = { speed: 78, torque: 53 }
-const robotB = { speed: 82, torque: 55 }
+// App.tsx 内のサンプルデータ差し替え
+const robotA = {
+  imageUrl: '/TEST.png',
+  motors: [
+    { speed: 78, torque: 53 },
+    { speed: 75, torque: 50 },
+    { speed: 80, torque: 55 },
+    { speed: 72, torque: 48 },
+    { speed: 77, torque: 52 },
+    { speed: 79, torque: 54 },
+  ],
+}
+const robotB = {
+  imageUrl: '/TEST.png', // B用の別画像があれば差し替え
+  motors: [
+    { speed: 82, torque: 55 },
+    { speed: 79, torque: 51 },
+    { speed: 84, torque: 57 },
+    { speed: 76, torque: 49 },
+    { speed: 81, torque: 53 },
+    { speed: 83, torque: 56 },
+  ],
+}
 
 // サイクルタイムはジョブ別・ロボット別ではなく、A・B合算の1つの値として扱う
 const cycleTime = 4.4
 
-const loadA = [
-  { name: '動作', value: 70 },
-  { name: '待機', value: 20 },
-  { name: '停止', value: 10 },
-]
-
-const loadB = [
-  { name: '動作', value: 62 },
-  { name: '待機', value: 28 },
-  { name: '停止', value: 10 },
-]
-
-
-// 銘板クイズ（quizページ）用のサンプルデータ
+// 銘板クイズ（quizページ）用データ
+// choices[0] が正解（correctIndex: 0）。「わからない」は各問共通の固定第5選択肢
+// としてNameplateQuiz側で自動的に追加される。
 const sampleQuestions: NameplateQuestion[] = [
   {
     id: '1',
-    question: '「停止」を示すアイコンは？',
+    question: 'のアイコンの意味は？',
+    choices: ['運転起動', '高速運転', '低速運転', '寸動運転'],
     correctIndex: 0,
+    explanation: '運転開始の合図で周りに運転することを知らせます。',
+    videoUrl: {
+      light: 'run buzzer.mp4',
+      dark: 'run buzzer.mp4'
+    },
+    iconUrl: {
+      light: 'buzzer_light.png',
+      dark: 'buzzer.png'
+    }
   },
   {
     id: '2',
-    question: '「運転起動」を示すアイコンは？',
-    correctIndex: 1,
+    question: 'のアイコンの意味は？',
+    choices: ['停止', '緊急停止', '低速運転', '高速運転'],
+    correctIndex: 0,
+    explanation: '減速しながら機械を停止させます。',
+    videoUrl: {
+      light: '停止.mp4',
+      dark: '停止.mp4'
+    },
+    iconUrl: {
+      light: 'stop_light.png', 
+      dark: 'stop.png'    
+    }
   },
   {
     id: '3',
-    question: '「エラーリセット」を示すアイコンは？',
-    correctIndex: 2,
+    question: 'のアイコンの意味は？',
+    choices: ['エラーリセット', '緊急停止', 'ブザーリセット', '設定値初期化'],
+    correctIndex: 0,
+    explanation: '異常状態をリセットします。',
+    videoUrl: {
+      light: 'エラーリセット.mp4',
+      dark: 'エラーリセット.mp4'
+    },
+    iconUrl: {
+      light: 'error reset_light.png', 
+      dark: 'error reset.png'    
+    }
   },
   {
     id: '4',
-    question: '「カウンタリセット」を示すアイコンは？',
-    correctIndex: 3,
+    question: 'のアイコンの意味は？',
+    choices: ['カウンタリセット', 'パスワード入力', 'ブザーリセット', 'カウントアップ'],
+    correctIndex: 0,
+    explanation: 'カウントされていた値を0にリセットします。',
+    videoUrl: {
+      light: 'カウンタリセット.mp4',
+      dark: 'カウンタリセット.mp4'
+    },
+    iconUrl: {
+      light: 'counter reset_light.png', 
+      dark: 'counter reset.png'    
+    }
   },
 ]
-const sampleQuizStats: QuizStats = {
-  totalAnswered: 0,
-  totalCorrect: 0,
-  streak: 0,
-  history: [],
-}
-
 export default function App() {
   const isTouchDevice = !window.matchMedia('(hover: hover)').matches
   const [intervalSec, setIntervalSec] = useState(0.5)
   const [showSettings, setShowSettings] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
-  const [themeKey, setThemeKey] = useState<ThemeKey>('dark-blue')
+  const [themeKey, setThemeKey] = useState<ThemeKey>('dark-exhibition')
   const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-
+  const [isAdminOpen, setIsAdminOpen] = useState(false)
   const theme = THEMES[themeKey]
   const settingsRef = useRef<HTMLDivElement>(null)
   const gearBtnRef = useRef<HTMLDivElement>(null)
@@ -124,15 +168,12 @@ export default function App() {
     isPlaying: true,
     intervalSec: 0.5,
     selectedAddresses: [
-      QUIZ_QUESTION_ADDRESS,
-      QUIZ_RESULT_ADDRESS,
       JOB_FLOW_STEP_ADDRESS,
       JOB_FLOW_CYCLE_CURRENT_ADDRESS,
       JOB_FLOW_CYCLE_TOTAL_ADDRESS,
     ],
   })
 
-  const { activeQuestionId, resultFlag } = usePlcQuizSignals(plcData)
   const { activeStep, cycleCurrent, cycleTotal } = usePlcJobFlowSignals(plcData)
 
   useEffect(() => {
@@ -276,40 +317,44 @@ export default function App() {
               onIntervalChange={setIntervalSec}
               onPlayingChange={setIsPlaying}
               onEditingChange={setIsEditing}
+              isNameplatePage={currentPage === 'quiz'}
+              onOpenAdmin={() => setIsAdminOpen(true)}
             />
           </div>
         )}
 
         {/* ページコンテンツ（4項目）*/}
         <div className="dashboard-page" style={{ display: currentPage === 'dashboard' ? 'flex' : 'none' }}>
-          <RobotArmDashboard theme={theme} isEditing={isEditing} />
+          <RobotArmDashboard theme={theme} isEditing={isEditing} onEditingChange={setIsEditing}/>
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'control' ? 'flex' : 'none' }}>
-          <OperationResults
-            theme={theme}
-            series={sampleSeries}
-            isEditing={isEditing}
-            activeStep={activeStep}
-            cycleCurrent={cycleCurrent}
-            cycleTotal={cycleTotal}
-          />
-        </div>
+         <OperationResults
+           theme={theme}
+           series={sampleSeries}
+           metrics={sampleMetrics}
+           isEditing={isEditing}
+           activeStep={activeStep}
+           cycleCurrent={cycleCurrent}
+           cycleTotal={cycleTotal}
+           onEditingChange={setIsEditing}
+         />
+       </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'anomaly' ? 'flex' : 'none' }}>
-          <OperationStatus theme={theme} robotA={robotA} robotB={robotB} cycleTime={cycleTime} loadA={loadA} loadB={loadB} />
+          <OperationStatus theme={theme} robotA={robotA} robotB={robotB} cycleTime={cycleTime} isEditing={isEditing} onEditingChange={setIsEditing} />
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'quiz' ? 'flex' : 'none' }}>
-         <NameplateQuiz
-           theme={theme}
-           questions={sampleQuestions}
-           initialStats={sampleQuizStats}
-           themeMode={getThemeMode(themeKey)}
-           activeQuestionId={activeQuestionId}
-           resultFlag={resultFlag}
-          />
-       </div>
+          <NameplateQuiz
+            theme={theme}
+            questions={sampleQuestions}
+            themeMode={getThemeMode(themeKey)}
+            isAdminOpen={isAdminOpen}
+            onAdminOpenChange={setIsAdminOpen}
+            
+         />
+        </div>
       </div>
     </div>
   )

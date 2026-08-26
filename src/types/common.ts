@@ -2,7 +2,7 @@
 // 型定義（テーマ・ページ共通）
 // =============================================
 
-export type ThemeKey = 'dark-blue' | 'dark-red' | 'dark-green' | 'light-blue' | 'light-red' | 'light-green'
+export type ThemeKey = 'dark-exhibition' | 'dark-blue' | 'dark-red' | 'dark-green' | 'light-blue' | 'light-red' | 'light-green'
 
 export type Theme = {
   label: string

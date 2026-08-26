@@ -132,7 +132,7 @@ export default function AdminResultsPanel({
                       {b.d.totalAnswered > 0 ? `${b.d.correctRate}%` : '-'}
                     </text>
                     <text x={b.x + barW / 2} y={chartH - 4} textAnchor="middle" className="admin-panel__chart-x-label">
-                      {b.d.date.slice(5)}
+                     {b.d.date.slice(5).replace('-', '/')}
                     </text>
                   </g>
                 ))}
@@ -299,7 +299,7 @@ export default function AdminResultsPanel({
                   <g key={i}>
                     <circle cx={p.x} cy={p.y} r={3.5} className="admin-panel__chart-dot" />
                     <text x={p.x} y={chartH - 4} textAnchor="middle" className="admin-panel__chart-x-label">
-                      {p.d.date.slice(5)}
+                      {p.d.date.slice(5).replace('-', '/')}
                     </text>
                     <text x={p.x} y={p.y - 8} textAnchor="middle" className="admin-panel__chart-y-label">
                       {p.d.totalAnswered > 0 ? `${p.d.correctRate}%` : '-'}

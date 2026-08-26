@@ -60,7 +60,7 @@ export default function NameplateQuiz({
   const isMobile = useIsMobile()
 
   const [overall, setOverall] = useState(() => getOverallStats())
-
+  
   const dateOptions = useMemo(() => recentDateOptions(5), [])
 
   const currentQuestionId = progress.order[progress.currentIndex] ?? null
@@ -71,7 +71,13 @@ export default function NameplateQuiz({
   const currentVideoUrl = question?.videoUrl?.[themeMode]
   const currentIconUrl = question?.iconUrl?.[themeMode]
   const isLastQuestion = progress.currentIndex === progress.order.length - 1
+  
+  const [videoReady, setVideoReady] = useState(false)
 
+  useEffect(() => {
+  setVideoReady(false)
+}, [currentVideoUrl])
+   
   const rate = overall.totalAnswered > 0 ? Math.round((overall.totalCorrect / overall.totalAnswered) * 100) : 0
 
   const ring = useMemo(() => {
@@ -262,14 +268,21 @@ useEffect(() => {
             // 問題表示：動画（背景）＋問題文＋選択肢（クリック可）。タイマーなし。
             <div className="nameplate-quiz__question-view">
               {currentVideoUrl && (
-                <video
-                  key={currentVideoUrl}
-                  src={currentVideoUrl}
-                  className="nameplate-quiz__video"
-                  autoPlay
-                  muted
-                  loop
-                />
+             <video
+               key={currentVideoUrl}
+               src={currentVideoUrl}
+               className="nameplate-quiz__video"
+               autoPlay
+               muted
+               loop
+               playsInline
+               preload="auto"
+               onCanPlay={() => setVideoReady(true)}
+               style={{ opacity: videoReady ? 1 : 0 }}
+              />
+              )}
+              {currentVideoUrl && !videoReady && (
+                <p className="nameplate-quiz__media-placeholder">読み込み中…</p>
               )}
 
               {question?.question && (

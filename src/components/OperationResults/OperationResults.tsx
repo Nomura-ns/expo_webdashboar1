@@ -155,8 +155,17 @@ export default function OperationResults({
     [metrics, customColors]
   )
 
-  const activeItems = viewMode === 'job' ? jobItems : metricItems
-  const activeDates = viewMode === 'job' ? jobDates : metricDates
+  // 変更後
+  const activeItems = useMemo(() => {
+  const base = viewMode === 'job' ? jobItems : metricItems
+  // 刃物交換・検査結果タブの円グラフでは OK / NG のみ表示する
+  if (viewMode === 'metrics' && chartType === 'pie') {
+    return base.filter((it) => it.id !== 'bladeChangeCount')
+  }
+  return base
+}, [viewMode, chartType, jobItems, metricItems])
+
+const activeDates = viewMode === 'job' ? jobDates : metricDates
 
   const plotW = CHART_W - PAD_L - 10
   const plotH = CHART_H - PAD_T - PAD_B

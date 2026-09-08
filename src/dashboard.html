@@ -12,8 +12,6 @@
     width: 100vw;
     height: 100vh;
   }
-
-  /* 1920×2160 が横に4枚並ぶ構成 */
   .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -21,14 +19,12 @@
     width: 100vw;
     height: 100vh;
   }
-
   .panel {
-    border: none;   /* 白線を出したくない場合は none のまま */
+    border: none;
     overflow: hidden;
     width: 100%;
     height: 100%;
   }
-
   .panel iframe {
     width: 100%;
     height: 100%;
@@ -39,18 +35,10 @@
 </head>
 <body>
   <div class="dashboard-grid">
-    <div class="panel" id="panel-1">
-      <iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=dashboard"></iframe>
-    </div>
-    <div class="panel" id="panel-2">
-      <iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=control"></iframe>
-    </div>
-    <div class="panel" id="panel-3">
-      <iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=anomaly"></iframe>
-    </div>
-    <div class="panel" id="panel-4">
-      <iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=quiz"></iframe>
-    </div>
+    <div class="panel"><iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=dashboard"></iframe></div>
+    <div class="panel"><iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=control"></iframe></div>
+    <div class="panel"><iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=anomaly"></iframe></div>
+    <div class="panel"><iframe src="https://joyful-sunshine-9b2402.netlify.app/?page=quiz"></iframe></div>
   </div>
 </body>
 </html>

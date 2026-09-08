@@ -68,17 +68,22 @@ html, body {
 }
 
 /* --- ダッシュボード共通レイアウト --- */
+:root {
+  /* パネル全体を右にずらす量。ここだけ触れば全ページに反映される */
+  --panel-offset-x: 30px;
+}
 /* 高さは flex:1 でヘッダーの実高さ(--header-h)に追従させる方式を正とする */
 .dashboard-page {
-  padding: 35px;
+  padding: 35px 35px calc(35px + 20px);
   box-sizing: border-box;
   width: 100%;
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  transform: translate(30px, -450px);
+  transform: translateX(var(--panel-offset-x));
 }
+
 
 /* =============================================
    レスポンシブ
@@ -117,7 +122,5 @@ html, body {
     flex: 1;
   }
 
-  .dashboard-page {
-    padding: 10px;
-  }
+ 
 }

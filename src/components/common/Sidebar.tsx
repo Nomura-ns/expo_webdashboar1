@@ -613,26 +613,26 @@ export default function Sidebar({
       {/* ブックマークタブ */}
       <div style={{
         position: 'fixed',
-        top: '78px',
-        left: sidebarOpen ? '200px' : '-22px',
+        top: '10%',
+        left: sidebarOpen ? '10.2%' : '-1.2%',
         display: 'flex', flexDirection: 'column',
         alignItems: 'flex-start',
         paddingTop: '20px',
         zIndex: 50,
-        transition: 'left 0.3s ease',
+        transition: 'left 0.2s ease',
       }}>
         <div
   onClick={onToggle}
   onMouseEnter={handleSidebarMouseEnter}
   style={{
-    width: '110px', height: '40px',
+    width: '100%', height: '100%',
     background: sidebarOpen ? theme.accent : theme.surface,
     color: sidebarOpen ? '#fff' : theme.subtext,
     border: `1px solid ${sidebarOpen ? theme.accent : theme.border}`,
     borderRadius: '6px 6px 0 0',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     gap: '4px',
-    fontSize: '18px', fontWeight: 'bold',
+    fontSize: '23px', fontWeight: 'bold',
     cursor: 'pointer',
     transition: 'all 0.2s',
     transform: 'rotate(90deg) translateX(48px) translateY(70px)',

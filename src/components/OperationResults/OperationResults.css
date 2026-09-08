@@ -104,7 +104,7 @@
 .op-results__robot-flows-header {
   display: flex;
   justify-content: flex-end;
-  transform: translateY(-20px);
+  transform: translateY(-35px);
 }
 
 .op-results__robot-col-title {
@@ -136,7 +136,7 @@
   flex: 1;
   min-height: 230px;
   align-items: stretch;
-  transform: translateY(-35px);
+  transform: translateY(-57px);
 }
 
 .op-results__pie-panel,

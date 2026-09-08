@@ -371,7 +371,7 @@ export default function App() {
         flexDirection: 'column',
        }}
       >
-      <div style={{ position: 'relative', flex: 1, paddingBottom: '40px' }}></div>
+      
         {/* サイドバー（内部でモバイル/PCを判定して表示を切替） */}
         <Sidebar
           theme={theme}

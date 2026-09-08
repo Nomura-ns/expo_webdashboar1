@@ -29,26 +29,6 @@ export interface CycleTimePoint {
 
 export type ThemeMode = 'light' | 'dark'
 
-/**
- * 選択肢の並び順は固定（PLC側の選択肢アドレスと対応させるため）。
- * choices[correctIndex] が正解。「わからない」は選択肢配列に含めず、
- * 固定の第5選択肢としてUI側で常に追加する。
- */
-export interface NameplateQuestion {
-  id: string
-  videoUrl?: {          
-    light: string
-    dark: string
-  }
-  question: string
-  /** 4択の選択肢テキスト（正解1つ＋不正解3つ）。表示順=この配列順 */
-  choices: string[]
-  correctIndex: number
-  /** 正誤判定後に表示する解説文 */
-  explanation: string
-}
-
-
 // ── 集計ページ（作成者用）用：回答ログ ────────────────
 
 /**
@@ -81,6 +61,11 @@ export interface DailyCorrectRate {
   correctRate: number
 }
 
+/**
+ * 選択肢の並び順は固定（PLC側の選択肢アドレスと対応させるため）。
+ * choices[correctIndex] が正解。「わからない」は選択肢配列に含めず、
+ * 固定の第5選択肢としてUI側で常に追加する。
+ */
 export interface NameplateQuestion {
   id: string
   videoUrl?: {
@@ -93,8 +78,10 @@ export interface NameplateQuestion {
     dark: string
   }
   question: string
+  /** 4択の選択肢テキスト（正解1つ＋不正解3つ）。表示順=この配列順 */
   choices: string[]
   correctIndex: number
+  /** 正誤判定後に表示する解説文 */
   explanation: string
 }
 

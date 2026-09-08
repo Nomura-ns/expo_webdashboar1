@@ -1,20 +1,21 @@
 // AdminResultsPanel.tsx
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { NameplateQuestion, Theme, ThemeMode, ChoiceBreakdown, DailyCorrectRate } from '../../types'
 import './AdminResultsPanel.css'
+import { createPortal } from 'react-dom'
 
 interface AdminResultsPanelProps {
   theme: Theme
   questions: NameplateQuestion[]
   themeMode: ThemeMode
   dateOptions: { label: string; value: string }[]
-  getBreakdown: (question: NameplateQuestion, dateRange?: string[]) => ChoiceBreakdown[]
-  getDailyCorrectRates: (dates: string[], questionIds?: string[]) => DailyCorrectRate[]
+  getBreakdown: (question: NameplateQuestion, dateRange?: string[]) => Promise<ChoiceBreakdown[]>
+  getDailyCorrectRates: (dates: string[], questionIds?: string[]) => Promise<DailyCorrectRate[]>
   onClose?: () => void
   password?: string
   /**
    * true: モニタに常時埋め込む「公開用」表示。パスワード不要・答えは一切見せない
-   *       （カテゴリ別の日別正解率の棒グラフのみ）。
+   *       （カテゴリ別の日別正解率をまとめた棒グラフのみ）。
    * false: 鍵ボタンから開くオーバーレイ表示。パスワード解錠後に詳細（問題別タグ・
    *        選択肢ごとの集計・折れ線グラフ）を表示する。モバイル/デスクトップ共通。
    */
@@ -23,6 +24,21 @@ interface AdminResultsPanelProps {
 
 const CATEGORY_TABS = ['全体', '運転起動', '停止', 'エラーリセット', 'カウンタリセット'] as const
 type CategoryTab = (typeof CATEGORY_TABS)[number]
+
+// モニタ表示のグラフで使う色。テーマの accent とは別に、5カテゴリを見分けやすい
+// 固定パレットにしている（配色自体を変えたい場合はここだけ調整すればよい）。
+const CATEGORY_COLORS: Record<CategoryTab, string> = {
+  '全体': '#94a3b8',
+  '運転起動': '#e08a4c',
+  '停止': '#7a3b2c',
+  'エラーリセット': '#cbb787',
+  'カウンタリセット': '#8b9c8a',
+}
+
+// モニタ表示は常時開きっぱなしのため、定期的に再取得して反映する。
+// 今はlocalStorageなので実質同一端末内の変化しか拾えないが、DB接続後は
+// 他端末（スマホ）で増えた回答もここで自動的に反映されるようになる。
+const EMBEDDED_POLL_INTERVAL_MS = 20000
 
 export default function AdminResultsPanel({
   theme,
@@ -45,78 +61,71 @@ export default function AdminResultsPanel({
   } as React.CSSProperties
 
   // ─────────────────────────────────────────────
-  // 公開用（embedded）：カテゴリ別・日別正解率の棒グラフのみ。答えは一切表示しない。
+  // 公開用（embedded）：カテゴリ別・日別正解率をまとめた棒グラフのみ。答えは一切表示しない。
+  // 操作UIは持たず、直近日数ぶんを自動表示・自動更新する。
   // ─────────────────────────────────────────────
   if (embedded) {
-    const [category, setCategory] = useState<CategoryTab>('全体')
-    const [selectedDates, setSelectedDates] = useState<string[]>(dateOptions.map((d) => d.value))
+    const dates = useMemo(() => dateOptions.map((d) => d.value), [dateOptions])
 
-    const questionIds = useMemo(
+    const questionIdsByCategory = useMemo(() => {
+      const map = {} as Record<CategoryTab, string[] | undefined>
+      CATEGORY_TABS.forEach((cat) => {
+        map[cat] =
+          cat === '全体'
+            ? undefined
+            : questions.filter((q) => q.choices[q.correctIndex] === cat).map((q) => q.id)
+      })
+      return map
+    }, [questions])
+
+    const [seriesData, setSeriesData] = useState<Record<CategoryTab, DailyCorrectRate[]>>(
       () =>
-        category === '全体'
-          ? undefined
-          : questions.filter((q) => q.choices[q.correctIndex] === category).map((q) => q.id),
-      [category, questions]
+        Object.fromEntries(CATEGORY_TABS.map((c) => [c, [] as DailyCorrectRate[]])) as Record<
+          CategoryTab,
+          DailyCorrectRate[]
+        >
     )
 
-    const dailyRates = useMemo(() => {
-      const dates = dateOptions.filter((d) => selectedDates.includes(d.value))
-      return getDailyCorrectRates(dates.map((d) => d.value), questionIds)
-    }, [dateOptions, selectedDates, questionIds, getDailyCorrectRates])
+    useEffect(() => {
+      let cancelled = false
+      const refresh = async () => {
+        const entries = await Promise.all(
+          CATEGORY_TABS.map(async (cat) => {
+            const rates = await getDailyCorrectRates(dates, questionIdsByCategory[cat])
+            return [cat, rates] as const
+          })
+        )
+        if (!cancelled) {
+          setSeriesData(Object.fromEntries(entries) as Record<CategoryTab, DailyCorrectRate[]>)
+        }
+      }
+      refresh()
+      const interval = setInterval(refresh, EMBEDDED_POLL_INTERVAL_MS)
+      return () => {
+        cancelled = true
+        clearInterval(interval)
+      }
+    }, [dates, questionIdsByCategory, getDailyCorrectRates])
 
-    const toggleDate = (value: string) => {
-      setSelectedDates((prev) =>
-        prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
-      )
-    }
-
-    const chartW = 480
-    const chartH = 220
-    const padX = 34
+    const chartW = 1200         // 640 → 1200：3日分でも間隔にゆとりが出る横幅に拡大
+    const chartH = 260
+    const padX = 60              // 36 → 60：左右の余白も少し拡大
     const padY = 40
-    const barGap = 10
+    const groupGap = 80          // 22 → 80：日付グループ同士の間隔を大きく広げる
+    const barGap = 6             // 3 → 6：カテゴリ同士の棒の間隔も少し広げる
     const plotW = chartW - padX * 2
     const plotH = chartH - padY * 2
-    const barW = dailyRates.length > 0 ? (plotW - barGap * (dailyRates.length - 1)) / dailyRates.length : 0
-    const bars = dailyRates.map((d, i) => {
-      const x = padX + i * (barW + barGap)
-      const h = (d.correctRate / 100) * plotH
-      const y = padY + (plotH - h)
-      return { x, y, h, d }
-    })
+    const dateCount = dateOptions.length
+    const groupW = dateCount > 0 ? (plotW - groupGap * (dateCount - 1)) / dateCount : 0
+    const barW =
+      dateCount > 0 ? (groupW - barGap * (CATEGORY_TABS.length - 1)) / CATEGORY_TABS.length : 0
 
     return (
       <div className="admin-panel__embed" style={themeVars}>
         <div className="admin-panel__modal admin-panel__modal--embedded">
-          <div className="admin-panel__content">
-            <h2 className="admin-panel__title">日別正解率</h2>
-
-            <div className="admin-panel__tags">
-              {CATEGORY_TABS.map((c) => (
-                <button
-                  key={c}
-                  className={`admin-panel__tag${category === c ? ' is-active' : ''}`}
-                  onClick={() => setCategory(c)}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            <div className="admin-panel__dates">
-              {dateOptions.map((d) => (
-                <label key={d.value} className="admin-panel__date-chip">
-                  <input
-                    type="checkbox"
-                    checked={selectedDates.includes(d.value)}
-                    onChange={() => toggleDate(d.value)}
-                  />
-                  {d.label}
-                </label>
-              ))}
-            </div>
-
+          <div className="admin-panel__content admin-panel__lockview">
             <div className="admin-panel__chart-section">
+              <p className="admin-panel__chart-title">正解率推移</p>
               <svg viewBox={`0 0 ${chartW} ${chartH}`} className="admin-panel__chart">
                 <line
                   x1={padX}
@@ -125,19 +134,53 @@ export default function AdminResultsPanel({
                   y2={padY + plotH}
                   className="admin-panel__chart-baseline"
                 />
-                {bars.map((b, i) => (
-                  <g key={i}>
-                    <rect x={b.x} y={b.y} width={barW} height={b.h} rx={4} className="admin-panel__chart-bar" />
-                    <text x={b.x + barW / 2} y={b.y - 10} textAnchor="middle" className="admin-panel__chart-y-label">
-                      {b.d.totalAnswered > 0 ? `${b.d.correctRate}%` : '-'}
-                    </text>
-                    <text x={b.x + barW / 2} y={chartH - 4} textAnchor="middle" className="admin-panel__chart-x-label">
-                     {b.d.date.slice(5).replace('-', '/')}
-                    </text>
-                  </g>
-                ))}
+                {dateOptions.map((d, gi) => {
+                  const groupX = padX + gi * (groupW + groupGap)
+                  return (
+                    <g key={d.value}>
+                      {CATEGORY_TABS.map((cat, ci) => {
+                        const rate = seriesData[cat]?.[gi]
+                        const h = rate ? (rate.correctRate / 100) * plotH : 0
+                        const x = groupX + ci * (barW + barGap)
+                        const y = padY + (plotH - h)
+                        return (
+                          <rect
+                            key={cat}
+                            x={x}
+                            y={y}
+                            width={Math.max(barW, 0)}
+                            height={Math.max(h, 0)}
+                            rx={2}
+                            style={{ fill: CATEGORY_COLORS[cat] }}
+                          />
+                        )
+                      })}
+                      <text
+                        x={groupX + groupW / 2}
+                        y={chartH - 8}
+                        textAnchor="middle"
+                        className="admin-panel__chart-x-label"
+                      >
+                        {d.value.slice(5).replace('-', '/')}
+                      </text>
+                    </g>
+                  )
+                })}
               </svg>
-              {dailyRates.length === 0 && (
+
+              <div className="admin-panel__legend">
+                {CATEGORY_TABS.map((cat) => (
+                  <span key={cat} className="admin-panel__legend-item">
+                    <span
+                      className="admin-panel__legend-dot"
+                      style={{ background: CATEGORY_COLORS[cat] }}
+                    />
+                    {cat}
+                  </span>
+                ))}
+              </div>
+
+              {dateOptions.length === 0 && (
                 <p className="admin-panel__empty">表示する日付がありません</p>
               )}
             </div>
@@ -162,15 +205,31 @@ export default function AdminResultsPanel({
     [questions, selectedQuestionId]
   )
 
-  const breakdown = useMemo(
-    () => (selectedQuestion ? getBreakdown(selectedQuestion, selectedDates) : []),
-    [selectedQuestion, selectedDates, getBreakdown]
-  )
+  const [breakdown, setBreakdown] = useState<ChoiceBreakdown[]>([])
+  useEffect(() => {
+    let cancelled = false
+    if (!selectedQuestion) {
+      setBreakdown([])
+      return
+    }
+    getBreakdown(selectedQuestion, selectedDates).then((b) => {
+      if (!cancelled) setBreakdown(b)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedQuestion, selectedDates, getBreakdown])
 
-  const dailyRates = useMemo(
-    () => getDailyCorrectRates(dateOptions.map((d) => d.value)),
-    [dateOptions, getDailyCorrectRates]
-  )
+  const [dailyRates, setDailyRates] = useState<DailyCorrectRate[]>([])
+  useEffect(() => {
+    let cancelled = false
+    getDailyCorrectRates(dateOptions.map((d) => d.value)).then((r) => {
+      if (!cancelled) setDailyRates(r)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [dateOptions, getDailyCorrectRates])
 
   const toggleDate = (value: string) => {
     setSelectedDates((prev) =>
@@ -200,7 +259,7 @@ export default function AdminResultsPanel({
   })
   const polyline = points.map((p) => `${p.x},${p.y}`).join(' ')
 
-  return (
+  return createPortal(
     <div className="admin-panel__overlay" style={themeVars}>
       <div className="admin-panel__modal">
         <button className="admin-panel__close" onClick={onClose} aria-label="閉じる">
@@ -213,6 +272,8 @@ export default function AdminResultsPanel({
             <p className="admin-panel__gate-desc">パスワードを入力してください</p>
             <input
               type="password"
+              id="adminPassword"
+              name="adminPassword"
               className={`admin-panel__pw-input${pwError ? ' is-error' : ''}`}
               value={pwInput}
               onChange={(e) => {
@@ -249,6 +310,8 @@ export default function AdminResultsPanel({
                 <label key={d.value} className="admin-panel__date-chip">
                   <input
                     type="checkbox"
+                    id={`date-${d.value}`}
+                    name="selectedDates"
                     checked={selectedDates.includes(d.value)}
                     onChange={() => toggleDate(d.value)}
                   />
@@ -311,6 +374,7 @@ export default function AdminResultsPanel({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

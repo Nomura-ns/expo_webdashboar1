@@ -1,57 +1,80 @@
-import { useState, useMemo, useRef, type PointerEvent } from 'react'
+import { useMemo, useRef, useState, type PointerEvent } from 'react'
 import PanelFrame from '../common/PanelFrame'
-import JobFlowDiagram from './JobFlowDiagram'
-import type { Theme, JobSeries, ChartType } from '../../types'
+import JobFlowDiagram, { RobotFlows } from './JobFlowDiagram'
+import type { Theme, ThemeMode } from '../../types'
 import './OperationResults.css'
 
-/** 刃物交換回数・NG検出回数・OK検出回数を日別に保持するデータ */
+/** 稼働実績（検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数・検査OK/NG）の日別データ */
 export interface MetricPoint {
   date: string
-  bladeChangeCount: number
-  ngCount: number
+  /** 検査回数 */
+  inspectCount: number
+  /** 異常回数 */
+  anomalyCount: number
+  /** 上刃挿入回数 */
+  insertCount: number
+  /** ねじ締め回数 */
+  tightenCount: number
+  /** ねじ緩め回数 */
+  loosenCount: number
+  /** 検査OK回数 */
   okCount: number
+  /** 検査NG回数 */
+  ngCount: number
 }
 
-type ViewMode = 'job' | 'metrics'
+type MetricKey = Exclude<keyof MetricPoint, 'date'>
 
 interface OperationResultsProps {
   theme: Theme
-  series: JobSeries[]
+  /** ライト／ダーク（QRコード画像の切替などに使用） */
+  themeMode: ThemeMode
   isEditing: boolean
   /** PLCのDアドレスから受け取る現在工程ステップ値。フロー図の該当工程を強調表示します。 */
   activeStep?: number
-  /** 現在のサイクル数 */
-  cycleCurrent?: number
-  /** 全体サイクル数（目標・予定回数） */
-  cycleTotal?: number
-  /** 刃物交換回数・NG検出回数・OK検出回数の日別データ */
-  metrics?: MetricPoint[]
-  
+  /** 稼働実績（検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数・検査OK/NG）の日別データ */
+  metrics: MetricPoint[]
+  /** 全体サイクルタイム（秒）。PLCのDレジスタ（未定）またはコード側の蓄積値から算出。 */
+  overallCycleTimeSec?: number
+  /** RB1のサイクルタイム（秒） */
+  rb1CycleTimeSec?: number
+  /** RB2のサイクルタイム（秒） */
+  rb2CycleTimeSec?: number
+  /** PLCのNG判定信号（true = NG検出中） */
+  ngSignal?: boolean
   onEditingChange: (value: boolean) => void
 }
 
 const CHART_W = 560
-const CHART_H = 348
-const PIE_CANVAS_H = 480 
 
+const PIE_CANVAS_H = 300
 
-const PAD_L = 34
-const PAD_B = 22
-const PAD_T = 10
+// 棒グラフ専用：3日分しかないので横に広めのアスペクト比を確保
+const BAR_CHART_W = 1800
+const BAR_CHART_H = 300
+const BAR_PAD_L = 56
+const BAR_PAD_R = 12
+const BAR_PAD_B = 28
+const BAR_PAD_T = 16
 
-const METRIC_DEFS: { key: keyof Omit<MetricPoint, 'date'>; label: string; defaultColor: string }[] = [
-  { key: 'bladeChangeCount', label: '刃物交換回数', defaultColor: '#f59e0b' },
-  { key: 'ngCount', label: 'NG検出回数', defaultColor: '#ef4444' },
-  { key: 'okCount', label: 'OK検出回数', defaultColor: '#22c55e' },
+/** 棒グラフ（ロボットモニタ）の5指標定義。表示順・色はモックアップに準拠 */
+const METRIC_DEFS: { key: MetricKey; label: string; defaultColor: string }[] = [
+  { key: 'inspectCount', label: '検査回数', defaultColor: '#4f9cd9' },
+  { key: 'anomalyCount', label: '異常回数', defaultColor: '#e0503f' },
+  { key: 'insertCount', label: '上刃挿入回数', defaultColor: '#e0b04f' },
+  { key: 'tightenCount', label: 'ねじ締め回数', defaultColor: '#4fbf8f' },
+  { key: 'loosenCount', label: 'ねじ緩め回数', defaultColor: '#8a7fc9' },
 ]
 
-/** タブ（ジョブ実行回数／刃物交換・検査結果）ごとのグラフ種類 */
-type ChartTypeMap = Record<ViewMode, ChartType>
+/** 円グラフ（OK/NG判定割合）の2指標定義 */
+const OKNG_DEFS: { key: MetricKey; label: string; defaultColor: string }[] = [
+  { key: 'okCount', label: 'OK', defaultColor: '#4f9cd9' },
+  { key: 'ngCount', label: 'NG', defaultColor: '#e0503f' },
+]
 
-const DEFAULT_CHART_TYPES: ChartTypeMap = {
-  job: 'bar',
-  metrics: 'pie',
-}
+/** 異常回数バッジ：常時うっすら赤みを付けて視認性を上げる */
+const ANOMALY_TINT = 'rgba(224, 80, 63, 0.14)'
+const NG_ACCENT_COLOR = '#e0503f'
 
 /** 円グラフの位置・大きさ */
 interface PieLayout {
@@ -60,35 +83,18 @@ interface PieLayout {
   r: number
 }
 
-const DEFAULT_PIE_R = CHART_H / 2 - 14
+const DEFAULT_PIE_R = PIE_CANVAS_H / 2 - 14
 const MIN_PIE_R = 24
-const MAX_PIE_R = 200
+const MAX_PIE_R = 130
 
 const DEFAULT_PIE_LAYOUT: PieLayout = {
-  cx: CHART_H / 2,
-  cy: CHART_H / 2,
+  cx: CHART_W / 2 - 60,
+  cy: PIE_CANVAS_H / 2,
   r: DEFAULT_PIE_R,
-}
-
-const DEFAULT_PIE_LAYOUTS: Record<ViewMode, PieLayout> = {
-  job: { ...DEFAULT_PIE_LAYOUT },
-  metrics: { ...DEFAULT_PIE_LAYOUT },
 }
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
-}
-
-function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) }
-}
-
-function describeArc(cx: number, cy: number, r: number, startAngle: number, endAngle: number) {
-  const start = polarToCartesian(cx, cy, r, endAngle)
-  const end = polarToCartesian(cx, cy, r, startAngle)
-  const largeArc = endAngle - startAngle > 180 ? 1 : 0
-  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${r} ${r} 0 ${largeArc} 0 ${end.x} ${end.y} Z`
 }
 
 /** マウス／タッチのクライアント座標をSVGのユーザー座標系に変換 */
@@ -102,6 +108,18 @@ function toSvgPoint(svg: SVGSVGElement, clientX: number, clientY: number) {
   return { x: transformed.x, y: transformed.y }
 }
 
+function formatCycleTime(sec?: number) {
+  if (!sec || sec <= 0) return '--'
+  return `${sec.toFixed(1)} 秒`
+}
+
+function computeMaxCount(barItems: ChartItem[]): number {
+  const allValues = barItems.flatMap((it) => it.values)
+  const max = Math.max(...allValues, 0)
+  const padded = max + 5
+  return Math.max(Math.round(padded / 10) * 10, 10) // 0除算・0上限防止
+}
+
 interface ChartItem {
   id: string
   label: string
@@ -111,76 +129,59 @@ interface ChartItem {
 
 export default function OperationResults({
   theme,
-  series,
+  themeMode,
   isEditing,
   activeStep,
-  cycleCurrent,
-  cycleTotal,
   metrics,
+  overallCycleTimeSec,
+  rb1CycleTimeSec,
+  rb2CycleTimeSec,
+  ngSignal,
   onEditingChange,
 }: OperationResultsProps) {
-  const [chartTypes, setChartTypes] = useState<ChartTypeMap>(DEFAULT_CHART_TYPES)
-  const [viewMode, setViewMode] = useState<ViewMode>('job')
   const [customColors, setCustomColors] = useState<Record<string, string>>({})
-  const [pieLayouts, setPieLayouts] = useState<Record<ViewMode, PieLayout>>(DEFAULT_PIE_LAYOUTS)
+  const [pieLayout, setPieLayout] = useState<PieLayout>(DEFAULT_PIE_LAYOUT)
 
   const pieSvgRef = useRef<SVGSVGElement | null>(null)
   const dragModeRef = useRef<'move' | 'resize' | null>(null)
 
-  const chartType = chartTypes[viewMode]
-  const pieLayout = pieLayouts[viewMode]
+  const dates = metrics.map((m) => m.date)
+  const latest = metrics.at(-1)
 
-  const jobDates = series[0]?.data.map((d) => d.date) ?? []
-  const metricDates = (metrics ?? []).map((m) => m.date)
-
-  const jobItems: ChartItem[] = useMemo(
-    () =>
-      series.map((s) => ({
-        id: s.jobId,
-        label: s.shortName,
-        color: customColors[s.jobId] ?? s.color,
-        values: s.data.map((d) => d.count),
-      })),
-    [series, customColors]
-  )
-
-  const metricItems: ChartItem[] = useMemo(
+  const barItems: ChartItem[] = useMemo(
     () =>
       METRIC_DEFS.map((def) => ({
         id: def.key,
         label: def.label,
         color: customColors[def.key] ?? def.defaultColor,
-        values: (metrics ?? []).map((m) => m[def.key]),
+        values: metrics.map((m) => m[def.key]),
       })),
     [metrics, customColors]
   )
 
-  // 変更後
-  const activeItems = useMemo(() => {
-  const base = viewMode === 'job' ? jobItems : metricItems
-  // 刃物交換・検査結果タブの円グラフでは OK / NG のみ表示する
-  if (viewMode === 'metrics' && chartType === 'pie') {
-    return base.filter((it) => it.id !== 'bladeChangeCount')
-  }
-  return base
-}, [viewMode, chartType, jobItems, metricItems])
-
-const activeDates = viewMode === 'job' ? jobDates : metricDates
-
-  const plotW = CHART_W - PAD_L - 10
-  const plotH = CHART_H - PAD_T - PAD_B
-  const groupW = plotW / Math.max(activeDates.length, 1)
-  const barW = Math.min(10, (groupW - 8) / Math.max(activeItems.length, 1))
-  const gridLines = 4
-
-  const maxCount = Math.max(...activeItems.flatMap((it) => it.values), 1)
-  const todayTotal = activeItems.reduce((sum, it) => sum + (it.values.at(-1) ?? 0), 0)
-
-  const totals = useMemo(
-    () => activeItems.map((it) => ({ ...it, total: it.values.reduce((sum, v) => sum + v, 0) })),
-    [activeItems]
+  const okNgItems: ChartItem[] = useMemo(
+    () =>
+      OKNG_DEFS.map((def) => ({
+        id: def.key,
+        label: def.label,
+        color: customColors[def.key] ?? def.defaultColor,
+        values: metrics.map((m) => m[def.key]),
+      })),
+    [metrics, customColors]
   )
-  const grandTotal = Math.max(totals.reduce((sum, it) => sum + it.total, 0), 1)
+
+  
+const plotH = BAR_CHART_H - BAR_PAD_T - BAR_PAD_B
+const groupW = (BAR_CHART_W - BAR_PAD_L - BAR_PAD_R) / dates.length
+const barW = Math.min(60, groupW / (barItems.length + 1)) // 3日分なので上限も少し広げる
+const maxCount = computeMaxCount(barItems)
+const gridLines = 4  
+
+  const okNgTotals = useMemo(
+    () => okNgItems.map((it) => ({ ...it, total: it.values.reduce((sum, v) => sum + v, 0) })),
+    [okNgItems]
+  )
+  const grandTotal = Math.max(okNgTotals.reduce((sum, it) => sum + it.total, 0), 1)
 
   const handleColorChange = (id: string, color: string) => {
     setCustomColors((prev) => ({ ...prev, [id]: color }))
@@ -188,27 +189,15 @@ const activeDates = viewMode === 'job' ? jobDates : metricDates
 
   const handleResetColors = () => setCustomColors({})
 
-  const handleChartTypeChange = (t: ChartType) => {
-    setChartTypes((prev) => ({ ...prev, [viewMode]: t }))
-  }
-
-  const handleResetPieLayout = () => {
-    setPieLayouts((prev) => ({ ...prev, [viewMode]: { ...DEFAULT_PIE_LAYOUT } }))
-  }
+  const handleResetPieLayout = () => setPieLayout({ ...DEFAULT_PIE_LAYOUT })
 
   const handlePieRadiusStep = (delta: number) => {
-    setPieLayouts((prev) => ({
-      ...prev,
-      [viewMode]: { ...prev[viewMode], r: clamp(prev[viewMode].r + delta, MIN_PIE_R, MAX_PIE_R) },
-    }))
+    setPieLayout((prev) => ({ ...prev, r: clamp(prev.r + delta, MIN_PIE_R, MAX_PIE_R) }))
   }
 
   const handlePieRadiusInput = (value: number) => {
     if (Number.isNaN(value)) return
-    setPieLayouts((prev) => ({
-      ...prev,
-      [viewMode]: { ...prev[viewMode], r: clamp(value, MIN_PIE_R, MAX_PIE_R) },
-    }))
+    setPieLayout((prev) => ({ ...prev, r: clamp(value, MIN_PIE_R, MAX_PIE_R) }))
   }
 
   const beginPieDrag = (mode: 'move' | 'resize') => (e: PointerEvent<SVGElement>) => {
@@ -219,23 +208,22 @@ const activeDates = viewMode === 'job' ? jobDates : metricDates
   }
 
   const handlePiePointerMove = (e: PointerEvent<SVGElement>) => {
-  const mode = dragModeRef.current
-  const svg = pieSvgRef.current
-  if (!mode || !svg) return
-  const p = toSvgPoint(svg, e.clientX, e.clientY)
+    const mode = dragModeRef.current
+    const svg = pieSvgRef.current
+    if (!mode || !svg) return
+    const p = toSvgPoint(svg, e.clientX, e.clientY)
 
-  setPieLayouts((prev) => {
-    const cur = prev[viewMode]
-    if (mode === 'move') {
-      const cx = clamp(p.x, cur.r, CHART_W - cur.r)
-      const cy = clamp(p.y, cur.r, PIE_CANVAS_H - cur.r)   // ← CHART_H → PIE_CANVAS_H
-      return { ...prev, [viewMode]: { ...cur, cx, cy } }
-    }
-    const dist = Math.hypot(p.x - cur.cx, p.y - cur.cy)
-    const r = clamp(dist, MIN_PIE_R, MAX_PIE_R)
-    return { ...prev, [viewMode]: { ...cur, r } }
-  })
-}
+    setPieLayout((prev) => {
+      if (mode === 'move') {
+        const cx = clamp(p.x, prev.r, CHART_W - prev.r)
+        const cy = clamp(p.y, prev.r, PIE_CANVAS_H - prev.r)
+        return { ...prev, cx, cy }
+      }
+      const dist = Math.hypot(p.x - prev.cx, p.y - prev.cy)
+      const r = clamp(dist, MIN_PIE_R, MAX_PIE_R)
+      return { ...prev, r }
+    })
+  }
 
   const endPieDrag = (e: PointerEvent<SVGElement>) => {
     dragModeRef.current = null
@@ -246,355 +234,380 @@ const activeDates = viewMode === 'job' ? jobDates : metricDates
     }
   }
 
+  const qrSrc = themeMode === 'dark' ? '/QR_dark.png' : '/QR_light.png'
+
   return (
     <PanelFrame className="op-results">
-      <div className="op-results__top">
-        <div className="op-results__legend">
-          {activeItems.map((it) => (
-            <span key={it.id} className="op-results__legend-item" style={{ color: theme.subtext }}>
-              <span className="op-results__swatch" style={{ background: it.color }} />
-              {it.label}
-            </span>
-          ))}
-        </div>
-        <div className="op-results__today">
-          <span className="op-results__today-label" style={{ color: theme.subtext }}>本日合計</span>
-          <span className="op-results__today-value" style={{ color: theme.accent }}>{todayTotal}</span>
-          <span className="op-results__today-unit" style={{ color: theme.subtext }}>件</span>
-        </div>
-      </div>
-
-      <div className="op-results__tabs">
-       <button
-         type="button"
-         className={`op-results__tab ${viewMode === 'job' ? 'is-active' : ''}`}
-         style={{
-          color: viewMode === 'job' ? theme.accent : theme.subtext,
-          background: viewMode === 'job' ? `${theme.accent}33` : 'transparent',
-        }}
-       onClick={() => setViewMode('job')}
-      >
-       ジョブ実行回数
-      </button>
-      <button
-       type="button"
-       className={`op-results__tab ${viewMode === 'metrics' ? 'is-active' : ''}`}
-       style={{
-        color: viewMode === 'metrics' ? theme.accent : theme.subtext,
-        background: viewMode === 'metrics' ? `${theme.accent}33` : 'transparent',
-      }}
-       onClick={() => setViewMode('metrics')}
-      >
-      刃物交換・検査結果
-    </button>
-    </div>
-
-      <div className={`op-results__body${isEditing ? ' is-editing' : ''}`}>
-        <div className="op-results__chart-wrap">
-          {chartType === 'bar' ? (
-            <svg
-              className="op-results__chart"
-              viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-              preserveAspectRatio="none"
-              role="img"
-              aria-label={viewMode === 'job' ? '日別ジョブ実行回数のグラフ' : '日別刃物交換・検査結果のグラフ'}
-              style={{ background: theme.surface }}
-            >
-              {Array.from({ length: gridLines + 1 }).map((_, i) => {
-                const y = PAD_T + (plotH / gridLines) * i
-                const value = Math.round(maxCount - (maxCount / gridLines) * i)
-                return (
-                  <g key={i}>
-                    <line
-                      x1={PAD_L}
-                      x2={CHART_W - 10}
-                      y1={y}
-                      y2={y}
-                      stroke={theme.border}
-                      strokeWidth={1}
-                      opacity={0.6}
-                    />
-                    <text
-                      x={PAD_L - 8}
-                      y={y + 3}
-                      textAnchor="end"
-                      className="op-results__axis-label"
-                      fill={theme.subtext}
-                    >
-                      {value}
-                    </text>
-                  </g>
-                )
-              })}
-
-              {activeDates.map((date, dIdx) => {
-                const groupX = PAD_L + groupW * dIdx
-                return (
-                  <g key={date}>
-                    {activeItems.map((it, sIdx) => {
-                      const count = it.values[dIdx] ?? 0
-                      const barH = (count / maxCount) * plotH
-                      const x =
-                        groupX +
-                        (groupW - activeItems.length * barW) / 2 +
-                        sIdx * barW
-                      const y = PAD_T + plotH - barH
-
-                      return (
-                        <rect
-                          key={it.id}
-                          x={x}
-                          y={y}
-                          width={barW - 2}
-                          height={barH}
-                          rx={1.5}
-                          fill={it.color}
-                          opacity={dIdx === activeDates.length - 1 ? 1 : 0.72}
-                        />
-                      )
-                    })}
-
-                    <text
-                      x={groupX + groupW / 2}
-                      y={CHART_H - 4}
-                      textAnchor="middle"
-                      className="op-results__axis-label"
-                      fill={theme.subtext}
-                    >
-                      {date}
-                    </text>
-                  </g>
-                )
-              })}
-            </svg>
-          ) : (
-            <svg
-              ref={pieSvgRef}
-              className="op-results__chart"
-              viewBox={`0 0 ${CHART_W} ${PIE_CANVAS_H}`}
-              preserveAspectRatio="xMidYMin meet"
-              role="img"
-              aria-label={viewMode === 'job' ? 'ジョブ別実行回数の円グラフ' : '刃物交換・検査結果の円グラフ'}
-              style={{ background: theme.surface }}
-            >
-              <g
-                onPointerDown={beginPieDrag('move')}
-                onPointerMove={handlePiePointerMove}
-                onPointerUp={endPieDrag}
-                onPointerCancel={endPieDrag}
-                style={{ cursor: isEditing ? 'grab' : 'default', touchAction: 'none' }}
+      <div className="op-results__body">
+        <div className="op-results__main-col">
+          {/* 上部：検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数 */}
+          <div className="op-results__badges">
+            {METRIC_DEFS.map((def) => (
+              <div
+                key={def.key}
+                className="op-results__badge"
+                style={{
+                  borderColor: def.key === 'anomalyCount' && ngSignal ? NG_ACCENT_COLOR : theme.border,
+                  background: def.key === 'anomalyCount' ? ANOMALY_TINT : theme.headerBg,
+                }}
               >
-                {(() => {
-                  let angle = 0
-                  return totals.map((it) => {
-                    const pct = it.total / grandTotal
-                    const startAngle = angle
-                    const endAngle = angle + pct * 360
-                    angle = endAngle
+                <span className="op-results__badge-label" style={{ color: theme.subtext }}>
+                  {def.label}
+                </span>
+                <span className="op-results__badge-value-wrap">
+                  <span className="op-results__badge-value" style={{ color: theme.text }}>
+                    {latest?.[def.key] ?? '--'}
+                  </span>
+                  <span className="op-results__badge-unit" style={{ color: theme.subtext }}>
+                    回
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
 
-                    return (
-                      <path
-                        key={it.id}
-                        d={describeArc(pieLayout.cx, pieLayout.cy, pieLayout.r, startAngle, endAngle)}
-                        fill={it.color}
-                        stroke={theme.surface}
-                        strokeWidth={1}
-                      />
-                    )
-                  })
-                })()}
-              </g>
+          {/* 全体サイクルタイム（フロー自体のタイトル・進捗はJobFlowDiagram内で表示） */}
+          <div
+            className="op-results__overall-row"
+            style={{ display: "flex", alignItems: "center" }}
+          >
+           <div className="op-results__cycle-badge">
+            <span>全体サイクルタイム</span>
+            <span>{formatCycleTime(overallCycleTimeSec)}</span>
+           </div>
+         </div>
 
-              {isEditing && (
-                <circle
-                  cx={pieLayout.cx}
-                  cy={pieLayout.cy - pieLayout.r}
-                  r={6}
-                  fill={theme.accent}
-                  stroke="#fff"
-                  strokeWidth={1.5}
-                  style={{ cursor: 'nwse-resize', touchAction: 'none' }}
-                  onPointerDown={beginPieDrag('resize')}
-                  onPointerMove={handlePiePointerMove}
-                  onPointerUp={endPieDrag}
-                  onPointerCancel={endPieDrag}
-                />
-              )}
 
-              {(() => {
-                const legendGap = 20
-                const legendX = pieLayout.cx + pieLayout.r + legendGap
-                const legendBlockH = totals.length * 16
-                const legendStartY = pieLayout.cy - legendBlockH / 2 + 4
+          <JobFlowDiagram theme={theme} activeStep={activeStep} ngSignal={ngSignal} />
 
-                return totals.map((it, i) => {
-                 const pct = Math.round((it.total / grandTotal) * 100)
-                 const legendY = legendStartY + i * 16
+          {/* RB1／RB2フロー（形状は全体フローと共通。各々枠で囲んで表示。ループは矢印ではなく注記テキストで表現） */}
+          <div className="op-results__robot-flows-header">
+            <span className="op-results__robot-col-cycle" style={{ color: theme.subtext }}>
+              RB1
+              <strong style={{ color: theme.accent }}>{formatCycleTime(rb1CycleTimeSec)}</strong>
+              　RB2
+              <strong style={{ color: theme.accent }}>{formatCycleTime(rb2CycleTimeSec)}</strong>
+            </span>
+          </div>
+          <RobotFlows theme={theme} activeStep={activeStep} />
 
-              return (
-               <g key={it.id}>
-                <rect x={legendX} y={legendY} width={8} height={8} rx={2} fill={it.color} />
-                <text
-                  x={legendX + 12}
-                  y={legendY + 8}
-                  className="op-results__axis-label"
-                  fill={theme.subtext}
+          {/* 下部：OK/NG判定割合（円グラフ）＋ ロボットモニタ（棒グラフ） */}
+          <div className="op-results__charts-row">
+            <div className="op-results__pie-panel">
+              <h3 className="op-results__panel-title" style={{ color: theme.text }}>
+                OK/NG判定割合
+              </h3>
+              <div className="op-results__chart-wrap">
+                <svg
+                  ref={pieSvgRef}
+                  className="op-results__chart"
+                  viewBox={`0 0 ${CHART_W} ${PIE_CANVAS_H}`}
+                  preserveAspectRatio="xMidYMid meet"
+                  role="img"
+                  aria-label="検査OK/NG判定割合の円グラフ"
+                  style={{ background: theme.surface }}
                 >
-                  {it.label} {pct}%
-                </text>
-               </g>
-              )
-            })
-          })()}
-            </svg>
-          )}
-        </div>
+                  <g
+                    onPointerDown={beginPieDrag('move')}
+                    onPointerMove={handlePiePointerMove}
+                    onPointerUp={endPieDrag}
+                    onPointerCancel={endPieDrag}
+                    style={{ cursor: isEditing ? 'grab' : 'default', touchAction: 'none' }}
+                  >
+                    {/* 背景リング（データが無い場合の土台） */}
+                    <circle
+                      cx={pieLayout.cx}
+                      cy={pieLayout.cy}
+                      r={pieLayout.r}
+                      fill="none"
+                      stroke={theme.border}
+                      strokeWidth={Math.max(pieLayout.r * 0.42, 12)}
+                      opacity={0.4}
+                    />
+                    <g transform={`rotate(-90 ${pieLayout.cx} ${pieLayout.cy})`}>
+                      {(() => {
+                        const ringWidth = Math.max(pieLayout.r * 0.42, 12)
+                        const circumference = 2 * Math.PI * pieLayout.r
+                        let cumulative = 0
+                        return okNgTotals.map((it) => {
+                          const pct = it.total / grandTotal
+                          const dash = pct * circumference
+                          const el = (
+                            <circle
+                              key={it.id}
+                              cx={pieLayout.cx}
+                              cy={pieLayout.cy}
+                              r={pieLayout.r}
+                              fill="none"
+                              stroke={it.color}
+                              strokeWidth={ringWidth}
+                              strokeDasharray={`${dash} ${Math.max(circumference - dash, 0)}`}
+                              strokeDashoffset={-cumulative}
+                              strokeLinecap={okNgTotals.length > 1 ? 'butt' : 'round'}
+                            />
+                          )
+                          cumulative += dash
+                          return el
+                        })
+                      })()}
+                    </g>
+                  </g>
+                  {(() => {
+                    const okItem = okNgTotals.find((it) => it.id === 'okCount')
+                    const okPct = grandTotal > 0 ? Math.round(((okItem?.total ?? 0) / grandTotal) * 100) : 0
+                    return (
+                      <text
+                        x={pieLayout.cx}
+                        y={pieLayout.cy}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize={Math.max(pieLayout.r * 0.42, 20)}
+                        fontWeight={700}
+                        fill={theme.text}
+                      >
+                        {okPct}%
+                      </text>
+                    )
+                  })()}
 
-        <div className="op-results__flow-wrap">
-          <JobFlowDiagram
-            theme={theme}
-            activeStep={activeStep}
-            cycleCurrent={cycleCurrent}
-            cycleTotal={cycleTotal}
-            colorOverrides={customColors}
-          />
+                  {isEditing && (
+                    <circle
+                      cx={pieLayout.cx}
+                      cy={pieLayout.cy - pieLayout.r}
+                      r={6}
+                      fill={theme.accent}
+                      stroke="#fff"
+                      strokeWidth={1.5}
+                      style={{ cursor: 'nwse-resize', touchAction: 'none' }}
+                      onPointerDown={beginPieDrag('resize')}
+                      onPointerMove={handlePiePointerMove}
+                      onPointerUp={endPieDrag}
+                      onPointerCancel={endPieDrag}
+                    />
+                  )}
+                </svg>
+              </div>
+              <div className="op-results__legend">
+                {okNgTotals.map((it) => {
+                  const pct = grandTotal > 0 ? Math.round((it.total / grandTotal) * 100) : 0
+                  return (
+                    <span key={it.id} className="op-results__legend-item" style={{ color: theme.subtext }}>
+                      <span className="op-results__swatch" style={{ background: it.color }} />
+                      {it.label}：{it.total}回（{pct}%）
+                    </span>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="op-results__bar-panel">
+              <h3 className="op-results__panel-title" style={{ color: theme.text }}>
+                ロボットモニタ
+              </h3>
+              <div className="op-results__chart-wrap op-results__chart-wrap--bar">
+                <svg
+                  className="op-results__chart op-results__chart--bar"
+                  viewBox={`0 0 ${BAR_CHART_W} ${BAR_CHART_H}`}
+                  preserveAspectRatio="xMidYMid meet"
+                  role="img"
+                  aria-label="日別稼働実績の棒グラフ"
+                  style={{ background: theme.surface }}
+                >
+                  {Array.from({ length: gridLines + 1 }).map((_, i) => {
+  const y = BAR_PAD_T + (plotH / gridLines) * i
+  const value = Math.round(maxCount - (maxCount / gridLines) * i)
+  return (
+    <g key={i}>
+      <line
+        x1={BAR_PAD_L}
+        x2={BAR_CHART_W - 10}
+        y1={y}
+        y2={y}
+        stroke={theme.border}
+        strokeWidth={1}
+        opacity={0.6}
+      />
+      <text x={BAR_PAD_L - 8} y={y + 3} textAnchor="end" className="op-results__axis-label" fill={theme.subtext}>
+        {value}
+      </text>
+    </g>
+  )
+})}
+
+{dates.map((date, dIdx) => {
+  const groupX = BAR_PAD_L + groupW * dIdx
+  return (
+    <g key={date}>
+      {barItems.map((it, sIdx) => {
+        const count = it.values[dIdx] ?? 0
+        const barH = (count / maxCount) * plotH
+        const x = groupX + (groupW - barItems.length * barW) / 2 + sIdx * barW
+        const y = BAR_PAD_T + plotH - barH
+        return (
+          <g key={it.id}>
+            <rect
+              x={x}
+              y={y}
+              width={barW - 10}
+              height={barH}
+              rx={1.5}
+              fill={it.color}
+              opacity={dIdx === dates.length - 1 ? 1 : 0.72}
+            >
+              <title>{`${date} ${it.label}: ${count}回`}</title>
+            </rect>
+            <text
+              x={x + (barW - 2) / 2}
+              y={y - 3}
+              textAnchor="middle"
+              className="op-results__bar-value-label"
+              fill={theme.text}
+            >
+              {count}
+            </text>
+          </g>
+        )
+      })}
+      <text
+        x={groupX + groupW / 2}
+        y={BAR_CHART_H - 4}
+        textAnchor="middle"
+        className="op-results__axis-label"
+        fill={theme.subtext}
+      >
+        {date}
+      </text>
+    </g>
+  )
+})}
+                </svg>
+              </div>
+              <div className="op-results__legend">
+                {barItems.map((it) => (
+                  <span key={it.id} className="op-results__legend-item" style={{ color: theme.subtext }}>
+                    <span className="op-results__swatch" style={{ background: it.color }} />
+                    {it.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
         {isEditing && (
-          <div
-            className="op-results__edit-panel"
-            style={{
-              background: theme.headerBg,
-              borderColor: theme.border,
-            }}
-          >
+          <div className="op-results__edit-panel" style={{ background: theme.headerBg, borderColor: theme.border }}>
             <div className="op-results__edit-panel-scroll">
-              {/* 編集モードトグル（設定パネルと同期） */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-        <span style={{ fontSize: '14px', color: theme.text }}>編集モード</span>
-
-        <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
-          <input
-            type="checkbox"
-            checked={isEditing}
-            onChange={(e) => onEditingChange(e.target.checked)}
-            style={{ opacity: 0, width: 0, height: 0 }}
-          />
-          <span
-            style={{
-              position: 'absolute',
-              cursor: 'pointer',
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: isEditing ? theme.accent : '#ccc',
-              borderRadius: '24px',
-              transition: '0.2s',
-            }}
-          >
-            <span
-              style={{
-                position: 'absolute',
-                height: '18px',
-                width: '18px',
-                left: isEditing ? '23px' : '3px',
-                bottom: '3px',
-                backgroundColor: '#fff',
-                borderRadius: '50%',
-                transition: '0.2s',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-              }}
-            />
-          </span>
-        </label>
-
-        <span style={{ fontSize: '13px', color: theme.text }}>
-          {isEditing ? 'ON' : 'OFF'}
-        </span>
-      </div>
-              <section className="op-results__panel-section">
-                <h3>グラフ種類（{viewMode === 'job' ? 'ジョブ実行回数' : '刃物交換・検査結果'}）</h3>
-
-                <div className="op-results__edit-group">
-                  {(['bar', 'pie'] as ChartType[]).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      className={`op-results__chip ${chartType === t ? 'is-active' : ''}`}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <span style={{ fontSize: '14px', color: theme.text }}>編集モード</span>
+                <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
+                  <input
+                    type="checkbox"
+                    id="editMode"
+                    name="editMode"
+                    checked={isEditing}
+                    onChange={(e) => onEditingChange(e.target.checked)}
+                    style={{ opacity: 0, width: 0, height: 0 }}
+                  />
+                  <span
+                    style={{
+                      position: 'absolute',
+                      cursor: 'pointer',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: isEditing ? theme.accent : '#ccc',
+                      borderRadius: '24px',
+                      transition: '0.2s',
+                    }}
+                  >
+                    <span
                       style={{
-                        borderColor: theme.border,
-                        color: chartType === t ? theme.accent : theme.subtext,
+                        position: 'absolute',
+                        height: '18px',
+                        width: '18px',
+                        left: isEditing ? '23px' : '3px',
+                        bottom: '3px',
+                        backgroundColor: '#fff',
+                        borderRadius: '50%',
+                        transition: '0.2s',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
                       }}
-                      onClick={() => handleChartTypeChange(t)}
-                    >
-                      {t === 'bar' ? '棒グラフ' : '円グラフ'}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              {chartType === 'pie' && (
-                <section className="op-results__panel-section">
-                  <h3>円グラフの位置・大きさ</h3>
-                  <p className="op-results__hint" style={{ color: theme.subtext }}>
-                    円グラフ本体をドラッグで移動、右上のハンドル（●）をドラッグで大きさを変更できます。
-                  </p>
-
-                  <div className="op-results__size-control">
-                    <button
-                      type="button"
-                      className="op-results__size-btn"
-                      style={{ borderColor: theme.border, color: theme.subtext }}
-                      onClick={() => handlePieRadiusStep(-5)}
-                    >
-                      −
-                    </button>
-                    <input
-                      type="number"
-                      className="op-results__size-input"
-                      style={{ borderColor: theme.border, color: theme.subtext }}
-                      value={Math.round(pieLayout.r)}
-                      min={MIN_PIE_R}
-                      max={MAX_PIE_R}
-                      onChange={(e) => handlePieRadiusInput(Number(e.target.value))}
                     />
-                    <button
-                      type="button"
-                      className="op-results__size-btn"
-                      style={{ borderColor: theme.border, color: theme.subtext }}
-                      onClick={() => handlePieRadiusStep(5)}
-                    >
-                      ＋
-                    </button>
-                  </div>
+                  </span>
+                </label>
+                <span style={{ fontSize: '13px', color: theme.text }}>{isEditing ? 'ON' : 'OFF'}</span>
+              </div>
 
+              <section className="op-results__panel-section">
+                <h3 style={{ color: theme.text }}>円グラフの位置・大きさ（OK/NG判定割合）</h3>
+                <p className="op-results__hint" style={{ color: theme.subtext }}>
+                  円グラフ本体をドラッグで移動、右上のハンドル（●）をドラッグで大きさを変更できます。
+                </p>
+                <div className="op-results__size-control">
                   <button
                     type="button"
-                    className="op-results__color-reset"
+                    className="op-results__size-btn"
                     style={{ borderColor: theme.border, color: theme.subtext }}
-                    onClick={handleResetPieLayout}
+                    onClick={() => handlePieRadiusStep(-5)}
                   >
-                    位置・大きさをリセット
+                    −
                   </button>
-                </section>
-              )}
+                  <input
+                    type="number"
+                    id="pieRadius"
+                    name="pieRadius"
+                    className="op-results__size-input"
+                    style={{ borderColor: theme.border, color: theme.subtext }}
+                    value={Math.round(pieLayout.r)}
+                    min={MIN_PIE_R}
+                    max={MAX_PIE_R}
+                    onChange={(e) => handlePieRadiusInput(Number(e.target.value))}
+                  />
+                  <button
+                    type="button"
+                    className="op-results__size-btn"
+                    style={{ borderColor: theme.border, color: theme.subtext }}
+                    onClick={() => handlePieRadiusStep(5)}
+                  >
+                    ＋
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="op-results__color-reset"
+                  style={{ borderColor: theme.border, color: theme.subtext }}
+                  onClick={handleResetPieLayout}
+                >
+                  位置・大きさをリセット
+                </button>
+              </section>
 
               <section className="op-results__panel-section">
-                <h3>色</h3>
-
+                <h3 style={{ color: theme.text }}>色（ロボットモニタ）</h3>
                 <div className="op-results__edit-group">
-                  {activeItems.map((it) => (
+                  {barItems.map((it) => (
                     <label key={it.id} className="op-results__color-row">
                       <span className="op-results__color-row-label" style={{ color: theme.subtext }}>
                         {it.label}
                       </span>
-                      <input
-                        type="color"
-                        className="op-results__color-input"
-                        value={it.color}
-                        onChange={(e) => handleColorChange(it.id, e.target.value)}
-                      />
+                      <input type="color"id={`color-${it.id}`} name={`color-${it.id}`}className="op-results__color-input" value={it.color} onChange={(e) => handleColorChange(it.id, e.target.value)} />
                     </label>
                   ))}
+                </div>
+              </section>
 
+              <section className="op-results__panel-section">
+                <h3 style={{ color: theme.text }}>色（OK/NG判定割合）</h3>
+                <div className="op-results__edit-group">
+                  {okNgItems.map((it) => (
+                    <label key={it.id} className="op-results__color-row">
+                      <span className="op-results__color-row-label" style={{ color: theme.subtext }}>
+                        {it.label}
+                      </span>
+                      <input type="color"id={`okng-color-${it.id}`}name={`okng-color-${it.id}`} className="op-results__color-input" value={it.color} onChange={(e) => handleColorChange(it.id, e.target.value)} />
+                    </label>
+                  ))}
                   <button
                     type="button"
                     className="op-results__color-reset"
@@ -605,11 +618,12 @@ const activeDates = viewMode === 'job' ? jobDates : metricDates
                   </button>
                 </div>
               </section>
-
             </div>
           </div>
         )}
       </div>
+
+      <img src={qrSrc} alt="QRコード" className="op-results__qr" />
     </PanelFrame>
   )
 }

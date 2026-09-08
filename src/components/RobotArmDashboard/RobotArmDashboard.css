@@ -12,61 +12,122 @@
   overflow: hidden;
 }
 
-/* --- カメラ表示エリアを収める「ステージ」---
-   編集パネル分だけ幅が減っても、内側の .robot-dashboard__canvas を
-   縦横比を保ったまま scale() で均等縮小するための土台。
-   幅・高さは JS 側で計算した px 値をインラインstyleで指定する（フォールバックとしてflexも残す）。 */
-.robot-dashboard__canvas-stage {
-  position: relative;
+/* --- デスクトップ：ステータスカード行 + メインモニター --- */
+.robot-dashboard__monitor {
   flex: 1 1 auto;
   min-width: 0;
-  height: 98%;
   display: flex;
-  align-items: center;   /* scale後に高さが余る分を上下中央に寄せる */
-  justify-content: flex-start;
-  overflow: hidden;
-}
-
-/* --- カメラ表示エリア --- */
-.robot-dashboard__canvas {
-  position: relative;
-  flex-shrink: 0;
-  width: 100%;
-  height: 60vh;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.15); /* JS側(canvasBg)でテーマごとに上書きされます */
-  transform: translateY(0px);
-}
-
-.robot-dashboard__canvas-inner {
-  position: relative;
-  width: 100%;
+  flex-direction: column;
+  gap: 14px;
   height: 100%;
-  overflow: hidden;      /* ← クリップ専任。枠線なし・角丸なし（親のborder-radiusの内側に自然に収まる） */
 }
 
-.robot-dashboard__canvas.is-editing {
-  cursor: default;
+.robot-dashboard__status-row {
+  display: flex;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
-.robot-dashboard__node {
+.robot-dashboard__run-card {
+  flex: 0 0 220px;
+  border: 1px solid;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+}
+
+.robot-dashboard__run-label {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.robot-dashboard__info-card {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid;
+  border-radius: 12px;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.robot-dashboard__info-card-header {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.robot-dashboard__info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+}
+
+.robot-dashboard__info-row-label {
+  opacity: 0.65;
+}
+
+.robot-dashboard__info-row .is-normal {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.robot-dashboard__info-row .is-abnormal {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
+/* --- メインカメラモニター領域 --- */
+.robot-dashboard__monitor-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 正常巡回中に表示する「カメラ1 ⇄ カメラ2」のような切替インジケーター */
+.robot-dashboard__rotate-indicator {
   position: absolute;
-  transform: translate(-50%, -50%);
+  top: 10px;
+  left: 12px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  color: inherit;
 }
 
-.robot-dashboard__camera.draggable {
-  cursor: grab;
-  touch-action: none;
+.robot-dashboard__rotate-chip {
+  padding: 2px 4px;
+  opacity: 0.55;
+  transition: opacity 0.2s, color 0.2s;
 }
 
-.robot-dashboard__camera.draggable:active {
-  cursor: grabbing;
+.robot-dashboard__rotate-chip.is-active {
+  opacity: 1;
+  font-weight: 700;
 }
 
-/* --- カメラ枠 --- */
+.robot-dashboard__rotate-chip + .robot-dashboard__rotate-chip::before {
+  content: '⇄';
+  margin-right: 4px;
+  opacity: 0.5;
+}
+
+/* --- カメラ枠（メイン単体表示・分割表示・モバイル共通の中身） --- */
 .robot-dashboard__camera-frame {
   position: relative;
-  aspect-ratio: 4 / 3;
   border: 2px solid;
   border-radius: 10px;
   overflow: hidden;
@@ -74,12 +135,26 @@
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
+.robot-dashboard__camera-frame--main {
+  width: 93% !important;
+  height: 90% !important;
+  transform: translate(-40px,15px);
+}
+
+.robot-dashboard__camera-frame--main {
+  width: 92%;
+  height: 92%;
+  aspect-ratio: 4 / 3;
+  max-width: 100%;
+  max-height: 100%;
+}
+
 .robot-dashboard__camera-frame.is-normal {
   box-shadow: 0 0 12px rgba(60, 220, 130, 0.15);
 }
 
 .robot-dashboard__camera-frame.is-abnormal {
-  border-color: #ff4d4f;
+  border-color: var(--abnormal-color, #ff4d4f);
   box-shadow: 0 0 16px rgba(255, 70, 70, 0.35);
   animation: robot-dashboard-alert 1.6s ease-in-out infinite;
 }
@@ -138,6 +213,13 @@
   gap: 8px;
 }
 
+.robot-dashboard__camera-overlay-bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .robot-dashboard__camera-label {
   font-size: 1.5rem;
   font-weight: 600;
@@ -152,6 +234,43 @@
   background: rgba(0, 0, 0, 0.45);
   padding: 2px 8px;
   border-radius: 999px;
+}
+
+.robot-dashboard__camera-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.robot-dashboard__camera-clock {
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.robot-dashboard__camera-rec {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ff4d4f;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.robot-dashboard__camera-rec-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  animation: robot-dashboard-rec-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes robot-dashboard-rec-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
 }
 
 /* --- 正常 / 異常バッジ --- */
@@ -182,34 +301,30 @@
   box-shadow: 0 0 6px currentColor;
 }
 
-/* --- カメラ枠のリサイズハンドル（右下角）--- */
-.robot-dashboard__resize-handle {
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.25);
-  cursor: nwse-resize;
-  touch-action: none;
-  z-index: 5;
+/* --- 異常2台以上のときの分割表示 --- */
+.robot-dashboard__split-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
-.robot-dashboard__resize-handle::after {
-  content: '';
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 6px;
-  height: 6px;
-  border-right: 2px solid rgba(0, 0, 0, 0.55);
-  border-bottom: 2px solid rgba(0, 0, 0, 0.55);
+.robot-dashboard__split-grid .robot-dashboard__camera-frame {
+  width: 100%;
+  height: 100%;
 }
 
-.robot-dashboard__resize-handle:hover {
-  background: rgba(255, 255, 255, 0.45);
+/* --- QRコード（モニター領域右下固定） --- */
+.robot-dashboard__qr {
+position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
 }
 
 /* --- 編集パネル（右側固定） --- */
@@ -280,12 +395,19 @@
   font-size: 0.9rem;
 }
 
+.robot-dashboard__step-readout {
+  flex: 1;
+  text-align: center;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- カメラごとの個別編集リスト --- */
 .robot-dashboard__camera-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: 320px;
+  max-height: 420px;
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -362,18 +484,6 @@
   color: #ff6b6b;
 }
 
-/* --- サイズ直接入力欄（一括・個別共通）--- */
-.robot-dashboard__size-input {
-  flex: 1;
-  height: 32px;
-  text-align: center;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.05);
-  color: inherit;
-  font-size: 0.85rem;
-}
-
 /* --- モバイル版：1台だけ表示 + タブ/横スクロールで切替 --- */
 .robot-dashboard__mobile-wrap {
   display: flex;
@@ -398,6 +508,7 @@
 }
 
 .robot-dashboard__mobile-tab {
+  position: relative;
   flex: 0 0 auto;
   min-width: 32px;
   height: 28px;
@@ -413,6 +524,23 @@
 .robot-dashboard__mobile-tab.is-active {
   font-weight: 700;
   background: rgba(255, 255, 255, 0.12);
+}
+
+/* 異常発生中のカメラに対応するタブに出す「！」バッジ */
+.robot-dashboard__mobile-tab-alert {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--abnormal-color, #ff4d4f);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 6px rgba(255, 70, 70, 0.6);
 }
 
 /* 横スクロールで1台ずつ切替（スナップ）。表示は常に1台のみ */
@@ -458,7 +586,7 @@
 }
 
 .robot-dashboard__mobile-frame.is-abnormal {
-  border-color: #ff4d4f;
+  border-color: var(--abnormal-color, #ff4d4f);
   box-shadow: 0 0 16px rgba(255, 70, 70, 0.35);
   animation: robot-dashboard-alert 1.6s ease-in-out infinite;
 }

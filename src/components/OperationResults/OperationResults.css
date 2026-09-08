@@ -1,44 +1,250 @@
-.op-results__body {
+.op-results {
+  position: relative;
   display: flex;
-  flex: 1;
-  min-height: 0;
+  flex-direction: column;
   gap: 6px;
-  align-items: flex-start;
 }
 
-.op-results__body.is-editing {
+/* ===== 上部：指標バッジ（検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数） ===== */
+
+.op-results__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.op-results__badge {
+  flex: 1 1 160px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.op-results__badge-label {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.op-results__badge-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.op-results__badge-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.op-results__badge-unit {
+  font-size: 20px;
+}
+
+/* ===== 全体サイクルタイム ===== */
+
+.op-results__overall-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.op-results__cycle-badge {
+  flex: 0 0 200px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  text-align: center;
+  transform: translateY(-10px);
+}
+
+.op-results__cycle-badge-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.op-results__cycle-badge-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.op-results__axis-label {
+  font-size: 25px; /* 現状定義が見当たらないので明示しておくと安全 */
+}
+
+/* ===== フロー図（スクロール表示可能） ===== */
+
+.op-results__flow-scroll {
+  overflow: auto;
+  border-radius: 6px;
+}
+
+.op-results__flow-scroll--overall {
+  max-height: 150px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.op-results__flow-scroll--robot {
+  max-height: 120px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ===== RB1／RB2 フロー見出し行（サイクルタイム表示のみ。枠は各フローのFlowPanel側） ===== */
+
+.op-results__robot-flows-header {
+  display: flex;
+  justify-content: flex-end;
+  transform: translateY(-20px);
+}
+
+.op-results__robot-col-title {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.op-results__robot-col-cycle {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.op-results__robot-col-cycle strong {
+  font-size: 13px;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* ===== 下部：円グラフ／棒グラフ ===== */
+
+.op-results__charts-row {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+  min-height: 230px;
   align-items: stretch;
+  transform: translateY(-35px);
+}
+
+.op-results__pie-panel,
+.op-results__bar-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+.op-results__pie-panel {
+  flex: 0 0 23%;
+  align-items: center;
+}
+
+.op-results__bar-panel {
+  flex: 0 0 80%;
+}
+
+.op-results__panel-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  text-align: center;
 }
 
 .op-results__chart-wrap {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 80%;
   min-height: 0;
-  align-self: stretch;
   display: flex;
   
 }
 
 .op-results__chart {
-  width: 96%;
+  width: 90%;
   height: 100%;
-  max-height: none;
-  min-height: 0;
 }
 
-.op-results__flow-wrap {
-  flex: 0 0 auto;
-  min-width: 340px;
-  min-height: 0;
-  height: 790px;
-  overflow: hidden;
+/* 棒グラフ専用の追加ルール */
+.op-results__chart-wrap--bar {
+  width: 90%;
+  aspect-ratio: 1500 / 300; /* BAR_CHART_W / BAR_CHART_H と一致させる */
+}
+
+.op-results__chart--bar {
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== 凡例 ===== */
+
+.op-results__legend {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  align-items: flex-start;
-  align-self: stretch;
+  align-items: center;
+  gap: 4px 16px;
+  margin-top: 4px;
+}
+
+.op-results__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.op-results__bar-value-label {
+  font-size: 20px; /* 9px→11pxなど、今後さらに大きくしてもOK */
+  font-weight: 700;
+}
+
+.op-results__swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ===== QRコード ===== */
+
+.op-results__qr {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
 }
 
 /* ===== 編集パネル ===== */
+
+.op-results__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+  transform: translateY(-40px);
+}
+
+.op-results__main-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 
 .op-results__edit-panel {
   width: 280px;
@@ -69,106 +275,6 @@
   flex-direction: column;
   gap: 8px;
 }
-
-.op-results__edit-label {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.op-results__chip {
-  width: 100%;
-  padding: 8px 12px;
-  text-align: left;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.op-results__chip.is-active {
-  font-weight: bold;
-}
-/* ===== 凡例 ===== */
-
-.op-results__legend {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 16px; /* 縦の折り返し間隔 / 横の項目間隔 */
-}
-
-.op-results__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 15px;
-  white-space: nowrap;
-}
-
-.op-results__swatch {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-/* ===== タブ切換 ===== */
-.op-results__tabs {
-  display: inline-flex;
-  gap: 2px;
-  margin: 4px 0 6px;
-  padding: 2px;
-  border-radius: 8px;
-}
-
-.op-results__tab {
-  padding: 4px 10px;
-  font-size: 12px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.op-results__tab.is-active {
-  font-weight: bold;
-}
-
-/* ===== 色編集 ===== */
-
-.op-results__color-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.op-results__color-row-label {
-  font-size: 13px;
-}
-
-.op-results__color-input {
-  width: 32px;
-  height: 24px;
-  padding: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.op-results__color-reset {
-  margin-top: 4px;
-  padding: 6px 10px;
-  font-size: 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  align-self: flex-start;
-}
-/* ===== 円グラフの大きさ操作 ===== */
 
 .op-results__hint {
   margin: 0 0 8px;
@@ -204,4 +310,36 @@
   background: transparent;
   text-align: center;
   font-size: 13px;
+}
+
+.op-results__color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.op-results__color-row-label {
+  font-size: 13px;
+}
+
+.op-results__color-input {
+  width: 32px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.op-results__color-reset {
+  margin-top: 4px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  align-self: flex-start;
 }

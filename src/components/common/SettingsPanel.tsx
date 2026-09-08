@@ -5,12 +5,10 @@ import { THEMES } from './themes'
 type Props = {
   theme: Theme
   themeKey: ThemeKey
-  intervalSec: number
   isPlaying: boolean
   isEditing: boolean
   isNameplatePage: boolean       // 追加：銘板ページを開いているか
   onThemeChange: (key: ThemeKey) => void
-  onIntervalChange: (value: number) => void
   onPlayingChange: (value: boolean) => void
   onEditingChange: (value: boolean) => void
   onOpenAdmin: () => void        // 追加：作成者専用ページを開く
@@ -80,6 +78,8 @@ export default function SettingsPanel({
             <input
               type="checkbox"
               checked={isEditing}
+              id="editMode"
+              name="editMode"
               onChange={(e) => onEditingChange(e.target.checked)}
               style={{ opacity: 0, width: 0, height: 0 }}
             />

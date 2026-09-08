@@ -1,7 +1,7 @@
 // usePlcJobFlowSignals.ts
 import { useMemo } from 'react'
 import type { DataPoint } from '../types'
-import { addressToDataKey } from '../plc'
+import { getLatestDataPoint, readAddressOrUndefined } from '../utils/usePlcSignalUtils'
 
 /**
  * 工程フロー図（JobFlowDiagram）で使用するPLCアドレス。
@@ -26,17 +26,13 @@ type JobFlowSignals = {
  */
 export function usePlcJobFlowSignals(data: DataPoint[]): JobFlowSignals {
   return useMemo(() => {
-    const latest = data[data.length - 1]
+    const latest = getLatestDataPoint(data)
     if (!latest) return {}
 
-    const stepValue = latest[addressToDataKey(JOB_FLOW_STEP_ADDRESS)]
-    const currentValue = latest[addressToDataKey(JOB_FLOW_CYCLE_CURRENT_ADDRESS)]
-    const totalValue = latest[addressToDataKey(JOB_FLOW_CYCLE_TOTAL_ADDRESS)]
-
     return {
-      activeStep: typeof stepValue === 'number' ? stepValue : undefined,
-      cycleCurrent: typeof currentValue === 'number' ? currentValue : undefined,
-      cycleTotal: typeof totalValue === 'number' ? totalValue : undefined,
+      activeStep: readAddressOrUndefined(latest, JOB_FLOW_STEP_ADDRESS),
+      cycleCurrent: readAddressOrUndefined(latest, JOB_FLOW_CYCLE_CURRENT_ADDRESS),
+      cycleTotal: readAddressOrUndefined(latest, JOB_FLOW_CYCLE_TOTAL_ADDRESS),
     }
   }, [data])
 }

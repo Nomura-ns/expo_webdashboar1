@@ -1,49 +1,36 @@
-body {
+/* =============================================
+   グローバルリセット
+   ============================================= */
+* {
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* ← 全体スクロール禁止 */
 }
 
 #root {
   width: 100%;
+  height: 100vh;
   max-width: 100%;
   margin: 0 auto;
   min-height: 0;
-  height: auto;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
 }
 
+/* =============================================
+   共通パーツ（複数コンポーネントで使用）
+   ============================================= */
 .logo {
-  width: 150px;
   height: 25px;
-}
-
-/* --- App ヘッダー --- */
-.app-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 24px;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  box-sizing: border-box;
-}
-
-.app-header__brand {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.app-header__title {
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: 150px;
 }
 
 /* --- 設定パネル --- */
@@ -80,99 +67,28 @@ body {
   min-width: 0;
 }
 
-/* --- ダッシュボード --- */
+/* --- ダッシュボード共通レイアウト --- */
+/* 高さは flex:1 でヘッダーの実高さ(--header-h)に追従させる方式を正とする */
 .dashboard-page {
-  padding: 5px 35px 35px;
+  padding: 35px;
   box-sizing: border-box;
   width: 100%;
-  height: calc(100svh - 50px); /* 背景パネルの高さ(全ﾍﾟｰｼ共通) */
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  transform: translate(30px, -450px);
 }
 
-.status-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 13px;
-  flex-wrap: wrap;
-}
+/* =============================================
+   レスポンシブ
+   ============================================= */
 
-.status-bar__meta {
-  margin-left: auto;
-}
-
-.panel-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr; /* ← 追加：2行想定なら1fr 1fr、行数に応じて調整 */
-  gap: 24px;
-  flex: 1;
-  min-height: 0; /* グリッドが縮めるように */
-}
-
-
-.panel-card {
-  border-radius: 8px;
-  padding: 12px;
-  box-sizing: border-box;
-  min-width: 0;
-  min-height: 0;
-  display: flex; /* ← 追加：中の PanelFrame に高さを伝える */
-}
-
-/* --- パネル軸コントロール --- */
-.panel-axis-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  margin-bottom: 8px;
-}
-
-.panel-axis-controls__title {
-  font-size: 12px;
-  font-weight: bold;
-  white-space: nowrap;
-  margin-right: 4px;
-}
-
-.axis-group {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-
-.axis-group__label {
-  width: 36px;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.axis-group__select {
-  min-width: 0;
-}
-
-/* --- 制御フロー --- */
-.control-page {
-  padding: 35px 120px;
-  max-width: 1200px;
-  box-sizing: border-box;
-}
-
-/* --- タブレット（1列） --- */
-@media (max-width: 900px) {
-  .panel-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .control-page {
-    padding: 24px 20px;
+/* --- タブレット --- */
+@media (max-width: 1024px) {
+  .dashboard-page {
+    padding: 32px 20px 24px;
+    gap: 18px;
   }
 }
 
@@ -181,10 +97,6 @@ body {
   .logo {
     width: 110px;
     height: 18px;
-  }
-
-  .app-header {
-    padding: 8px 12px;
   }
 
   .settings-panel {
@@ -207,44 +119,5 @@ body {
 
   .dashboard-page {
     padding: 10px;
-  }
-
-  .status-bar {
-    gap: 8px;
-    padding: 10px 12px;
-    font-size: 12px;
-  }
-
-  .status-bar__meta {
-    margin-left: 0;
-    width: 100%;
-  }
-
-  .panel-grid {
-    gap: 14px;
-  }
-
-  .panel-card {
-    padding: 10px;
-  }
-
-  .panel-axis-controls--mobile {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 6px;
-  }
-
-  .panel-axis-controls--mobile .axis-group {
-    width: 100%;
-  }
-
-  .panel-axis-controls--mobile .axis-group__select {
-    flex: 1;
-    width: 100%;
-    max-width: none;
-  }
-
-  .control-page {
-    padding: 12px 10px;
   }
 }

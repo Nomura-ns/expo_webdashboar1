@@ -1,63 +1,72 @@
 /* JobFlowDiagram.css */
-.flow-diagram-wrap {
+
+/* ===== 各フロー（全体／RB1／RB2）共通：見出し・進捗・枠 ===== */
+
+.flow-diagram-panel {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  height: 98%;
-  min-width: 240px;
-  min-height: 0;
+  gap: 4px;
+  transform: translateY(-20px);
 }
 
-.flow-diagram-wrap__progress {
-  flex: 0 0 auto;
+.flow-diagram-panel-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 4px 2px;
-  margin-bottom: 2px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.flow-diagram-panel-title {
+  font-size: 13px;
+  font-weight: 700;
   font-family: var(--font-mono);
 }
 
-.flow-diagram-wrap__progress-label {
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
+.flow-diagram-progress {
+  font-size: 11px;
+  font-family: var(--font-mono);
 }
 
-.flow-diagram-wrap__progress-value {
-  font-size: 15px;
-  font-weight: 700;
-  white-space: nowrap;
+.flow-diagram-note {
+  font-size: 11px;
+  font-family: var(--font-mono);
 }
 
-.flow-diagram-wrap__progress-bar {
-  flex: 1;
-  height: 8px;
-  border-radius: 3px;
-  overflow: hidden;
+/* RB1／RB2フローを縦に並べる */
+.flow-robot-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transform: translateY(-10pX);
 }
 
-.flow-diagram-wrap__progress-bar-fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width 0.3s ease;
+/* SVGをそのままの大きさで描画し、はみ出した分は
+   FlowCanvas側で activeStep に追従して自動スライドさせる
+   （ユーザーによる手動スクロール操作は前提としない） */
+.flow-diagram-wrap {
+  display: inline-flex;
 }
 
 .flow-diagram {
-  flex: 1;
-  width: 100%;
-  height: 92%;
-  min-width: 240px;
-  min-height: 0;
+  display: block;
 }
 
-.flow__title { font-size: 32px; font-weight: 700; font-family: var(--font-mono); }
-.flow__label { font-size: 75px; font-family: var(--font-mono); }
-.flow__robot { font-size: 32px; font-weight: 700; font-family: var(--font-mono); }
-.flow__divider { font-size: 35px; font-family: var(--font-mono); }
-.flow__branch-label { font-size: 50px; font-family: var(--font-mono); font-weight: 700; }
+/* 各フローの枠（全体／RB1／RB2共通）。自動スライドで見せるため
+   スクロールバー自体は隠す */
+.op-results__flow-scroll {
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.op-results__flow-scroll::-webkit-scrollbar {
+  display: none;
+}
 
-/* アクティブ工程の強調表示 */
+.flow__label { font-size: 17px; font-family: var(--font-mono); }
+.flow__label--sm { font-size: 13px; font-family: var(--font-mono); }
+.flow__terminal-label { font-size: 15px; font-weight: 600; font-family: var(--font-mono); }
+.flow__branch-label { font-size: 12px; font-family: var(--font-mono); font-weight: 700; }
+
+/* アクティブ工程（PLCの現在ステップ）の強調表示 */
 .flow__node--active rect,
 .flow__node--active polygon {
   animation: flow-pulse 1.4s ease-in-out infinite;
@@ -68,8 +77,8 @@
 }
 
 @keyframes flow-pulse {
-  0%, 100% { stroke-width: 2; }
-  50% { stroke-width: 4; }
+  0%, 100% { stroke-width: 1.5; }
+  50% { stroke-width: 3; }
 }
 
 @keyframes flow-glow {

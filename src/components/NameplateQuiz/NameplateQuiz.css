@@ -8,11 +8,14 @@
 
 .nameplate-quiz__layout {
   display: grid;
-  grid-template-columns: clamp(140px, 16%, 220px) 1fr;
-  grid-template-rows: 1fr auto;
+  grid-template-columns:
+    clamp(140px, 16%, 220px)   /* side: リング */
+    1fr                         /* メイン: 招待カード＋グラフ */
+    clamp(160px, 18%, 300px);   /* mobile: スマホ画像専用列 */
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
-    'side media'
-    'side choices';
+    'side media   mobile'
+    'trend trend  mobile';
   gap: clamp(12px, 2vw, 24px);
   width: 97%;
   height: 100%;
@@ -22,19 +25,14 @@
 /* ---- 左カラム：リング + 凡例 + 数値 ---- */
 .nameplate-quiz__side {
   grid-area: side;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(10px, 1.5vw, 18px);
-  min-width: 0;
 }
 
 .nameplate-quiz__ring {
-  width: 120%;
-  max-width: 260px;
+  width: 160%;
+  max-width: 130%;
   aspect-ratio: 1 / 1;
   overflow: visible;
+  transform: translatex(-20%);
 }
 
 .nameplate-quiz__ring-track {
@@ -56,13 +54,13 @@
 
 .nameplate-quiz__ring-value {
   font-family: var(--font-mono);
-  font-size: 40px; 
+  font-size: 30px; 
   font-weight: 800;
   fill: var(--nq-accent, #38bdf8);
 }
 
 .nameplate-quiz__ring-unit {
-  font-size: 10px;
+  font-size: 8px;
   font-weight: 600;
   fill: var(--nq-accent, #38bdf8);
 }
@@ -149,13 +147,128 @@
   justify-content: center;
   min-height: 0;
   min-width: 0;
-  width: 105%;
-  height: 90%;
+  width: 100%;
+  height: 100%;
   border: 1px solid var(--nq-border, #245d9b);
   border-radius: 6px;
   background: var(--nq-surface, #23274f);
-  overflow: hidden;
+  overflow: hidden;   /* ← ここは死守。monitor側で上書きしない */
   position: relative;
+}
+
+/* ---- モニタ表示（!isMobile）のときの media：QR案内＋モバイル画像を横並びで見せる ---- */
+.nameplate-quiz__media--monitor {
+  grid-area: media;
+  border: none;
+  background: transparent;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: auto;
+  padding: clamp(12px, 1.6vw, 24px) 0;
+}
+
+.nameplate-quiz__invite {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 2.4vw, 36px);
+  flex: 0 1 auto;       /* 中身が入る分だけ広がる。伸びすぎたら縮む */
+  min-width: 0;
+  height: auto;
+  box-sizing: border-box;
+  background: var(--nq-surface, #23274f);
+  border: 1px solid var(--nq-border, #245d9b);
+  border-radius: 12px;
+  padding: clamp(18px, 2vw, 32px);
+  margin-left: auto;
+}
+
+.nameplate-quiz__invite::before {
+  content: "";
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+
+  border-top: 14px solid transparent;
+  border-bottom: 14px solid transparent;
+  border-left: 14px solid var(--nq-border); /* ←枠線色 */
+}
+
+.nameplate-quiz__invite::after {
+  content: "";
+  position: absolute;
+  right: -10px; /* before より少し内側 */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-left: 12px solid var(--nq-surface); /* ←背景色 */
+}
+
+
+.nameplate-quiz__invite-text {
+  min-width: 0;
+}
+
+.nameplate-quiz__invite-title {
+  margin: 0;
+  font-size: clamp(16px, 1.6vw, 30px);   /* 上限を40px→30pxに縮小 */
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--nq-text, #f1f5f9);
+  white-space: nowrap;                    /* ← 折り返し禁止 */
+}
+
+.nameplate-quiz__invite-sub {
+  margin: clamp(6px, 1vw, 12px) 0 0;
+  font-size: clamp(13px, 1.1vw, 17px);
+  color: var(--nq-subtext, #94a3b8);
+  white-space: nowrap;
+}
+
+.nameplate-quiz__invite-qr {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(6px, 0.8vw, 10px);
+  border: 1px solid var(--nq-border, #245d9b);
+  border-radius: 10px;
+  padding: clamp(14px, 1.6vw, 22px);
+  background: var(--nq-bg, #1a1e3f);
+  margin-left: auto; 
+}
+
+.nameplate-quiz__invite-qr-label {
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  font-size: clamp(13px, 1.0vw, 25px);
+  color: var(--nq-text, #f1f5f9);
+}
+
+.nameplate-quiz__invite-qr-img {
+  display: block;
+  width: clamp(110px, 12vw, 200px);  /* QR自体も少し大きく */
+  height: auto;
+  border-radius: 4px;
+}
+
+.nameplate-quiz__mobile-preview {
+  grid-area: mobile;
+  height: 90%;      /* 縦に伸びてOK。専用列なのでグラフを圧迫しない */
+  width: 100%;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
 }
 
 .nameplate-quiz__video {
@@ -174,6 +287,25 @@
   color: var(--nq-subtext, #94a3b8);
 }
 
+/* ---- 下段：モニタ表示のときの「正解率推移」グラフ ---- */
+.nameplate-quiz__trend {
+  grid-area: trend;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.nameplate-quiz__trend .admin-panel__embed {
+  height: 100%;
+  width: 100%;
+ 
+}
+
+.nameplate-quiz__trend .admin-panel__modal--embedded {
+  padding: clamp(10px, 1.4vw, 20px) 0 0;
+  height: auto;
+}
 
 /* ---- 下段：問題1〜4 タブボタン（未使用の場合は非表示でも可） ---- */
 .nameplate-quiz__choices {
@@ -550,6 +682,12 @@
     overflow-x: hidden;              /* 横スクロール禁止 */
     padding: 12px 14px;
     box-sizing: border-box;
+  }
+
+
+  .nameplate-quiz__mobile-preview {
+    height: auto;
+    max-width: 60%;
   }
 }
 

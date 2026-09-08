@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import type { ThemeKey, PageKey, JobSeries, NameplateQuestion } from './types'
+import './App.css'
+import type { ThemeKey, PageKey, NameplateQuestion } from './types'
 import { THEMES, PAGES, getThemeMode } from './components/common/themes'
 import Sidebar from './components/common/Sidebar'
 import SettingsPanel from './components/common/SettingsPanel'
@@ -9,77 +10,63 @@ import OperationStatus from './components/OperationStatus/OperationStatus'
 import NameplateQuiz from './components/NameplateQuiz/NameplateQuiz'
 import { usePlcWebSocket } from './hooks/usePlcWebSocket' 
 import { usePlcJobFlowSignals, JOB_FLOW_STEP_ADDRESS, JOB_FLOW_CYCLE_CURRENT_ADDRESS, JOB_FLOW_CYCLE_TOTAL_ADDRESS,} from './hooks/usePlcJobFlowSignals'
-import { JOB_DEFINITIONS } from './config/jobDefinitions'
+import { usePlcRobotStatusSignals } from './hooks/usePlcRobotStatusSignals'
+import { usePlcOperationMetricsSignals } from './hooks/usePlcOperationMetricsSignals'
+import { OPERATION_METRICS_ADDRESSES } from './config/operationMetricsAddresses'
 
-// サンプルデータ（実際はAPIやpropsから取得）
-const DATES = ['07/24', '07/25', '07/26', '07/27', '07/28']
+// ※ config/jobDefinitions.ts は使用しません（稼働実績は検査回数・異常回数・
+//   上刃挿入回数・ねじ締め回数・ねじ緩め回数・検査OK/NGの指標に統一したため）。
 
-// ジョブごとの日別サンプル実行回数（ダミー値）
-const SAMPLE_COUNTS: Record<string, number[]> = {
-  'pick-store':    [12, 15, 9, 18, 14],
-  'insert-fit':    [10, 13, 8, 16, 12],
-  'position':      [9, 12, 7, 14, 11],
-  'screw-tighten': [8, 10, 11, 7, 13],
-  'screw-loosen':  [7, 9, 6, 12, 10],
-  'inspect':       [6, 8, 5, 10, 9],
-  'sort':          [6, 8, 5, 10, 9],
-  'lid':           [5, 7, 4, 9, 8],
-  'exchange':      [3, 4, 2, 5, 4],
-  'ring-spring':   [3, 4, 2, 5, 4],
-}
+// サンプルデータ（実際はAPIやPLCから取得。当日分＝配列末尾はPLCの値があればそちらを優先）
+const DATES = [ '07/26', '07/27', '07/28']
 
-// 刃物交換・検査結果（OK/NG）用サンプルデータ
-const SAMPLE_METRICS: Record<'bladeChangeCount' | 'ngCount' | 'okCount', number[]> = {
-  bladeChangeCount: [2, 1, 3, 2, 1],
-  ngCount:          [5, 3, 7, 4, 2],
-  okCount:          [118, 132, 96, 145, 151],
+// 稼働実績5指標＋検査OK/NGのサンプルデータ（ダミー値）
+const SAMPLE_METRICS: Record<Exclude<keyof MetricPoint, 'date'>, number[]> = {
+  inspectCount:  [ 150, 150, 150],
+  anomalyCount:  [ 12, 6, 4],
+  insertCount:   [ 96, 145, 118],
+  tightenCount:  [ 150, 150, 150],
+  loosenCount:   [ 152, 140, 145],
+  okCount:       [ 96, 145, 151],
+  ngCount:       [ 7, 4, 2],
 }
 
 const sampleMetrics: MetricPoint[] = DATES.map((date, i) => ({
   date,
-  bladeChangeCount: SAMPLE_METRICS.bladeChangeCount[i] ?? 0,
-  ngCount: SAMPLE_METRICS.ngCount[i] ?? 0,
+  inspectCount: SAMPLE_METRICS.inspectCount[i] ?? 0,
+  anomalyCount: SAMPLE_METRICS.anomalyCount[i] ?? 0,
+  insertCount: SAMPLE_METRICS.insertCount[i] ?? 0,
+  tightenCount: SAMPLE_METRICS.tightenCount[i] ?? 0,
+  loosenCount: SAMPLE_METRICS.loosenCount[i] ?? 0,
   okCount: SAMPLE_METRICS.okCount[i] ?? 0,
-}))
-
-const sampleSeries: JobSeries[] = JOB_DEFINITIONS.map((def) => ({
-  jobId: def.id,
-  jobName: def.jobName,
-  shortName: def.shortName,
-  robot: def.robot,
-  phase: def.phase,
-  color: def.color,
-  data: DATES.map((date, i) => ({
-    date,
-    count: SAMPLE_COUNTS[def.id]?.[i] ?? 0,
-  })),
+  ngCount: SAMPLE_METRICS.ngCount[i] ?? 0,
 }))
 
 // 稼働状況（anomalyページ）用のサンプルデータ
-// ロボットA/Bは直近の速度・トルクの数値のみ（グラフ表示はしない）
-// App.tsx 内のサンプルデータ差し替え
-const robotA = {
-  imageUrl: '/TEST.png',
-  motors: [
-    { speed: 78, torque: 53 },
-    { speed: 75, torque: 50 },
-    { speed: 80, torque: 55 },
-    { speed: 72, torque: 48 },
-    { speed: 77, torque: 52 },
-    { speed: 79, torque: 54 },
-  ],
-}
-const robotB = {
-  imageUrl: '/TEST.png', // B用の別画像があれば差し替え
-  motors: [
-    { speed: 82, torque: 55 },
-    { speed: 79, torque: 51 },
-    { speed: 84, torque: 57 },
-    { speed: 76, torque: 49 },
-    { speed: 81, torque: 53 },
-    { speed: 83, torque: 56 },
-  ],
-}
+// RB1・RB2は同一機種のため、画像は1枚を共通で使用する
+const SHARED_ROBOT_IMAGE_URL = '/TEST.png'
+
+// 速度はPLC対象外のためサンプル値のまま。トルク・ピーク値・稼働率はPLC(Dレジスタ、未定)から取得予定で、
+// アドレス確定までのフォールバックとしてここに仮の値を置いている（config/robotStatusAddresses.ts 参照）
+const SAMPLE_RB1_MOTORS = [
+  { speed: 78, torque: 53, peakTorque: 61 },
+  { speed: 75, torque: 50, peakTorque: 58 },
+  { speed: 80, torque: 55, peakTorque: 64 },
+  { speed: 72, torque: 48, peakTorque: 56 },
+  { speed: 77, torque: 52, peakTorque: 60 },
+  { speed: 79, torque: 54, peakTorque: 62 },
+]
+const SAMPLE_RB1_UTILIZATION = 92
+
+const SAMPLE_RB2_MOTORS = [
+  { speed: 82, torque: 55, peakTorque: 63 },
+  { speed: 79, torque: 51, peakTorque: 59 },
+  { speed: 84, torque: 57, peakTorque: 66 },
+  { speed: 76, torque: 49, peakTorque: 57 },
+  { speed: 81, torque: 53, peakTorque: 61 },
+  { speed: 83, torque: 56, peakTorque: 64 },
+]
+const SAMPLE_RB2_UTILIZATION = 88
 
 // サイクルタイムはジョブ別・ロボット別ではなく、A・B合算の1つの値として扱う
 const cycleTime = 4.4
@@ -149,20 +136,39 @@ const sampleQuestions: NameplateQuestion[] = [
     }
   },
 ]
+// URLの ?page=xxx を読み取り、4分割パネルごとに違う初期ページを開けるようにする
+// 例）
+//   .../?page=dashboard  → RobotArmDashboard
+//   .../?page=control    → OperationResults
+//   .../?page=anomaly    → OperationStatus
+//   .../?page=quiz       → NameplateQuiz
+// パラメータが無い/不正な場合は従来どおり 'dashboard' にフォールバックする
+function getInitialPage(): PageKey {
+  const params = new URLSearchParams(window.location.search)
+  const requested = params.get('page')
+  const validKeys = PAGES.map((p) => p.key)
+  if (requested && (validKeys as string[]).includes(requested)) {
+    return requested as PageKey
+  }
+  return 'dashboard'
+}
+
 export default function App() {
   const isTouchDevice = !window.matchMedia('(hover: hover)').matches
-  const [intervalSec, setIntervalSec] = useState(0.5)
+  const [isGearHover, setIsGearHover] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [isPlaying, setIsPlaying] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [themeKey, setThemeKey] = useState<ThemeKey>('dark-exhibition')
-  const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
+  const [currentPage, setCurrentPage] = useState<PageKey>(getInitialPage)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isAdminOpen, setIsAdminOpen] = useState(false)
   const theme = THEMES[themeKey]
   const settingsRef = useRef<HTMLDivElement>(null)
   const gearBtnRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
+  const mode = getThemeMode(themeKey)
+
   const { data: plcData } = usePlcWebSocket({
     enabled: true, // quizページでも受信したいので常時 true（他ページの設定次第で調整）
     isPlaying: true,
@@ -171,10 +177,60 @@ export default function App() {
       JOB_FLOW_STEP_ADDRESS,
       JOB_FLOW_CYCLE_CURRENT_ADDRESS,
       JOB_FLOW_CYCLE_TOTAL_ADDRESS,
+      ...OPERATION_METRICS_ADDRESSES,
     ],
   })
 
-  const { activeStep, cycleCurrent, cycleTotal } = usePlcJobFlowSignals(plcData)
+  const { activeStep } = usePlcJobFlowSignals(plcData)
+
+  // RB1・RB2のトルク値・ピーク値・稼働率（PLC Dレジスタは未定のため現状は常に0が返る想定。
+  // 確定するまではサンプル値をフォールバックとして使用する）
+  const { rb1AxisTorques, rb2AxisTorques, rb1UtilizationRate, rb2UtilizationRate } =
+    usePlcRobotStatusSignals(plcData)
+
+  // 稼働実績5指標・NG判定信号・サイクルタイム（PLC Dレジスタは未定のため現状は常に0が返る想定。
+  // 確定するまではサンプル値をフォールバックとして使用する。サイクルタイムはPLC値が
+  // 無い場合、サイクル変更タイミング用bitの立上り間隔からコード側で算出した値を使用する）
+  const {
+    inspectCount,
+    anomalyCount,
+    insertCount,
+    tightenCount,
+    loosenCount,
+    ngSignal,
+    cycleTimeSec,
+  } = usePlcOperationMetricsSignals(plcData)
+
+  // 当日分（配列末尾）はPLCの値があればそちらを優先し、無ければサンプル値を使う
+  const liveMetrics: MetricPoint[] = sampleMetrics.map((m, i) => {
+    if (i !== sampleMetrics.length - 1) return m
+    return {
+      ...m,
+      inspectCount: inspectCount || m.inspectCount,
+      anomalyCount: anomalyCount || m.anomalyCount,
+      insertCount: insertCount || m.insertCount,
+      tightenCount: tightenCount || m.tightenCount,
+      loosenCount: loosenCount || m.loosenCount,
+    }
+  })
+
+  const robotRB1 = {
+    motors: SAMPLE_RB1_MOTORS.map((m, i) => ({
+      speed: m.speed,
+      torque: rb1AxisTorques[i]?.torque || m.torque,
+      peakTorque: rb1AxisTorques[i]?.peakTorque || m.peakTorque,
+    })),
+    utilizationRate: rb1UtilizationRate || SAMPLE_RB1_UTILIZATION,
+  }
+
+  const robotRB2 = {
+    motors: SAMPLE_RB2_MOTORS.map((m, i) => ({
+      speed: m.speed,
+      torque: rb2AxisTorques[i]?.torque || m.torque,
+      peakTorque: rb2AxisTorques[i]?.peakTorque || m.peakTorque,
+    })),
+    utilizationRate: rb2UtilizationRate || SAMPLE_RB2_UTILIZATION,
+  }
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -224,76 +280,98 @@ export default function App() {
       <header
         ref={headerRef}
         className="app-header"
-        style={{
-          background: theme.headerBg,
-          borderBottom: `1px solid ${theme.border}`,
-        }}
+        style={{ borderBottom: `1px solid ${theme.border}` }}
       >
-        <div className="app-header__brand">
-          <img src={theme.logo} alt="logo" className="logo" />
-          <span className="app-header__title" style={{ color: theme.subtext }}>
-            {PAGES.find((p) => p.key === currentPage)?.label}
-          </span>
-        </div>
-
-        {/* 歯車ボタン */}
         <div
-          ref={gearBtnRef}
-          style={{ position: 'relative', display: 'inline-block' }}
-          onMouseEnter={(e) => {
-            const tooltip = e.currentTarget.querySelector('.settings-tooltip') as HTMLElement
-            if (tooltip) tooltip.style.opacity = '1'
-          }}
-          onMouseLeave={(e) => {
-            const tooltip = e.currentTarget.querySelector('.settings-tooltip') as HTMLElement
-            if (tooltip) tooltip.style.opacity = '0'
-          }}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              setShowSettings((p) => !p)
-            }}
-            style={{
-              background: showSettings ? `${theme.accent}33` : 'transparent',
-              border: `1px solid ${showSettings ? theme.accent : theme.border}`,
-              borderRadius: '8px',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              fontSize: '18px',
-              lineHeight: 1,
-              transition: 'all 0.2s',
-            }}
-          >
-            ⚙️
-          </button>
-          <span
-            className="settings-tooltip"
-            style={{
-              position: 'absolute',
-              bottom: '-28px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              background: 'rgba(0,0,0,0.75)',
-              color: '#fff',
-              fontSize: '11px',
-              padding: '2px 8px',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap',
-              opacity: 0,
-              pointerEvents: 'none',
-              transition: 'opacity 0.2s',
-              zIndex: 200,
-              display: isTouchDevice ? 'none' : undefined,
-            }}
-          >
-            設定
-          </span>
-        </div>
+         className="app-header__brand"
+         style={{
+          background: sidebarOpen
+          ? mode === 'dark'
+            ? 'rgba(0,0,0,0.55)'   // ← オーバーレイと同じ暗さ
+            : 'rgba(180, 178, 178, 0.46)'
+          : theme.bg,
+          transition: 'background 0.1s ease',
+         }}
+         >
+          <img src={theme.logo} alt="logo" className="logo" />
+       </div>
+
+        <span className="app-header__title" style={{ color: theme.subtext,fontSize: '19px', }}>
+         {PAGES.find((p) => p.key === currentPage)?.label}
+        </span>
+
+       
+
+{/* 右側をまとめる */}
+<div
+  className="header-right"
+  ref={gearBtnRef}
+  style={{
+    position: 'relative',
+    display: 'inline-block',
+    justifySelf: 'end',   // ← これを追加
+  }}
+  onMouseEnter={() => setIsGearHover(true)}
+  onMouseLeave={() => setIsGearHover(false)}
+>
+  <button
+    onClick={(e) => {
+      e.stopPropagation()
+      setShowSettings((p) => !p)
+    }}
+    style={{
+      background: showSettings ? `${theme.accent}33` : 'transparent',
+      borderWidth: '1px',
+      borderStyle: 'solid',
+      borderColor: showSettings ? theme.accent : theme.border,
+      borderRadius: '8px',
+      padding: '6px 10px',
+      cursor: 'pointer',
+      fontSize: '15px',
+      lineHeight: 1,
+      transition: 'all 0.2s',
+    }}
+  >
+    ⚙️
+  </button>
+
+  <span
+    className="settings-tooltip"
+    style={{
+      position: 'absolute',
+      top: '100%',           // ← bottom指定より安定
+      marginTop: '6px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      background: 'rgba(0,0,0,0.75)',
+      color: '#fff',
+      fontSize: '11px',
+      padding: '2px 8px',
+      borderRadius: '4px',
+      whiteSpace: 'nowrap',
+      opacity: isTouchDevice ? 0 : (isGearHover ? 1 : 0),
+      pointerEvents: 'none',
+      transition: 'opacity 0.2s',
+      zIndex: 200,
+    }}
+    >
+     設定
+     </span>
+</div>
       </header>
+ 
 
       {/* ヘッダー下レイアウト */}
-      <div style={{ position: 'relative', flex: 1 }}>
+      <div
+       style={{
+        position: 'relative',
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+       }}
+      >
+      <div style={{ position: 'relative', flex: 1, paddingBottom: '40px' }}></div>
         {/* サイドバー（内部でモバイル/PCを判定して表示を切替） */}
         <Sidebar
           theme={theme}
@@ -302,6 +380,7 @@ export default function App() {
           onPageChange={setCurrentPage}
           onClose={() => setSidebarOpen(false)}
           onToggle={() => setSidebarOpen((p) => !p)}
+          footerHeight={30}
         />
 
         {/* 設定パネル */}
@@ -310,11 +389,10 @@ export default function App() {
             <SettingsPanel
               theme={theme}
               themeKey={themeKey}
-              intervalSec={intervalSec}
+    
               isPlaying={isPlaying}
               isEditing={isEditing}
               onThemeChange={setThemeKey}
-              onIntervalChange={setIntervalSec}
               onPlayingChange={setIsPlaying}
               onEditingChange={setIsEditing}
               isNameplatePage={currentPage === 'quiz'}
@@ -325,24 +403,35 @@ export default function App() {
 
         {/* ページコンテンツ（4項目）*/}
         <div className="dashboard-page" style={{ display: currentPage === 'dashboard' ? 'flex' : 'none' }}>
-          <RobotArmDashboard theme={theme} isEditing={isEditing} onEditingChange={setIsEditing}/>
+          <RobotArmDashboard theme={theme} themeMode={getThemeMode(themeKey)} isEditing={isEditing} onEditingChange={setIsEditing}/>
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'control' ? 'flex' : 'none' }}>
          <OperationResults
            theme={theme}
-           series={sampleSeries}
-           metrics={sampleMetrics}
+           themeMode={getThemeMode(themeKey)}
+           metrics={liveMetrics}
            isEditing={isEditing}
            activeStep={activeStep}
-           cycleCurrent={cycleCurrent}
-           cycleTotal={cycleTotal}
+           overallCycleTimeSec={cycleTimeSec}
+           rb1CycleTimeSec={cycleTimeSec}
+           rb2CycleTimeSec={cycleTimeSec}
+           ngSignal={ngSignal}
            onEditingChange={setIsEditing}
          />
        </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'anomaly' ? 'flex' : 'none' }}>
-          <OperationStatus theme={theme} robotA={robotA} robotB={robotB} cycleTime={cycleTime} isEditing={isEditing} onEditingChange={setIsEditing} />
+          <OperationStatus
+            theme={theme}
+            themeMode={getThemeMode(themeKey)}
+            imageUrl={SHARED_ROBOT_IMAGE_URL}
+            robotRB1={robotRB1}
+            robotRB2={robotRB2}
+            cycleTime={cycleTime}
+            isEditing={isEditing}
+            onEditingChange={setIsEditing}
+          />
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'quiz' ? 'flex' : 'none' }}>
@@ -356,6 +445,35 @@ export default function App() {
          />
         </div>
       </div>
+      <footer
+        style={{
+          position: 'fixed',      
+          bottom: 0,               
+          left: 0,                 
+          width: '100%',
+          padding: '3px 0px',
+          borderTop: `1px solid ${theme.border}`,
+          backgroundColor: theme.surface,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          zIndex: 100,              
+         }}
+        >
+      <span
+        style={{
+          color: theme.text,
+          fontSize: '20px',
+          letterSpacing: '0.5px',
+        }}
+      >
+        e
+        <span style={{ color: theme.accent }}>X</span>
+        ight
+      </span>
+    </footer>
     </div>
   )
+  
 }
+ 

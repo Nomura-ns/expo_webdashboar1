@@ -11,6 +11,12 @@ import './NameplateQuiz.css'
 
 const UNKNOWN_CHOICE_INDEX = 4 // 「わからない」
 
+// モニタ表示（!isMobile側）でのポーリング間隔。
+// 今はlocalStorageなので実際には同一端末内でしか意味を持たないが、
+// 将来DB接続に切り替えたときに「スマホの回答が自動でモニタに反映される」
+// ようにするための土台として最初から入れておく。
+const STATS_POLL_INTERVAL_MS = 15000
+
 interface NameplateQuizProps {
   theme: Theme
   questions: NameplateQuestion[]
@@ -59,8 +65,8 @@ export default function NameplateQuiz({
   const { progress, setProgress } = useQuizProgressCache()
   const isMobile = useIsMobile()
 
-  const [overall, setOverall] = useState(() => getOverallStats())
-  
+  const [overall, setOverall] = useState({ totalAnswered: 0, totalCorrect: 0 })
+
   const dateOptions = useMemo(() => recentDateOptions(5), [])
 
   const currentQuestionId = progress.order[progress.currentIndex] ?? null
@@ -71,13 +77,30 @@ export default function NameplateQuiz({
   const currentVideoUrl = question?.videoUrl?.[themeMode]
   const currentIconUrl = question?.iconUrl?.[themeMode]
   const isLastQuestion = progress.currentIndex === progress.order.length - 1
-  
+
   const [videoReady, setVideoReady] = useState(false)
 
   useEffect(() => {
   setVideoReady(false)
 }, [currentVideoUrl])
-   
+
+  // 累計正解率（サイドのリング表示用）。取得は非同期になったので初回取得＋定期ポーリングで更新する。
+  // DB接続に切り替えたとき、他端末（スマホ）で増えた回答もここで自動的に拾えるようにするため。
+  useEffect(() => {
+    let cancelled = false
+    const refresh = () => {
+      getOverallStats().then((stats) => {
+        if (!cancelled) setOverall(stats)
+      })
+    }
+    refresh()
+    const interval = setInterval(refresh, STATS_POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [getOverallStats])
+
   const rate = overall.totalAnswered > 0 ? Math.round((overall.totalCorrect / overall.totalAnswered) * 100) : 0
 
   const ring = useMemo(() => {
@@ -99,7 +122,12 @@ export default function NameplateQuiz({
     if (!question || progress.phase !== 'question') return
     const isUnknown = choiceIndex === UNKNOWN_CHOICE_INDEX
     const correct = !isUnknown && choiceIndex === question.correctIndex
-    logAnswer(question.id, choiceIndex, correct)
+
+    // 保存は非同期（将来DB化されると通信が挟まる）。UIの手触りを損なわないよう、
+    // 自分の画面上の集計は保存の完了を待たずに楽観的に更新する。
+    logAnswer(question.id, choiceIndex, correct).catch(() => {
+      // 保存に失敗しても回答自体の進行は止めない
+    })
     setOverall((prev) => ({
       totalAnswered: prev.totalAnswered + 1,
       totalCorrect: prev.totalCorrect + (correct ? 1 : 0),
@@ -126,7 +154,9 @@ useEffect(() => {
   const remaining = TIMEOUT_MS - elapsed
 
   const handleTimeout = () => {
-    logAnswer(targetQuestionId, UNKNOWN_CHOICE_INDEX, false)
+    logAnswer(targetQuestionId, UNKNOWN_CHOICE_INDEX, false).catch(() => {
+      // 保存に失敗しても進行は止めない
+    })
     setOverall((prev) => ({
       totalAnswered: prev.totalAnswered + 1,
       totalCorrect: prev.totalCorrect, // 未回答は正解数に加算しない
@@ -211,35 +241,48 @@ useEffect(() => {
       {!isMobile && (
         <div className="nameplate-quiz__side">
           <svg viewBox="-5 0 80 80" className="nameplate-quiz__ring" role="img" aria-label="正解率">
-            <circle cx="40" cy="35" r={ring.r} className="nameplate-quiz__ring-track" />
+            <circle cx="65" cy="80" r={ring.r} className="nameplate-quiz__ring-track" />
             <circle
-              cx="40"
-              cy="35"
+              cx="65"
+              cy="80"
               r={ring.r}
               className="nameplate-quiz__ring-fill"
               strokeDasharray={ring.c}
               strokeDashoffset={ring.offset}
             />
-            <text x="36" y="5" textAnchor="middle" className="nameplate-quiz__ring-value">
+            <text x="80" y="45" textAnchor="middle" className="nameplate-quiz__ring-value">
               {rate}
             </text>
-            <text x="36" y="18" textAnchor="middle" className="nameplate-quiz__ring-unit">
+            <text x="80" y="54" textAnchor="middle" className="nameplate-quiz__ring-unit">
               % 正解率
             </text>
           </svg>
         </div>
       )}
-        <div className="nameplate-quiz__media">
+        <div className={`nameplate-quiz__media${!isMobile ? ' nameplate-quiz__media--monitor' : ''}`}>
          {!isMobile ? (
-           <AdminResultsPanel
-             theme={theme}
-             questions={questions}
-             themeMode={themeMode}
-             dateOptions={dateOptions}
-             getBreakdown={getBreakdown}
-             getDailyCorrectRates={getDailyCorrectRates}
-             embedded
-           />
+           // ---- モニタ表示：スマホでの参加を促すQR案内＋モバイル版のイメージ ----
+           <>
+             <div className="nameplate-quiz__invite">
+               <div className="nameplate-quiz__invite-text">
+                 <p className="nameplate-quiz__invite-title">
+                   スマホでクイズに挑戦しよう
+                 </p>
+                 <p className="nameplate-quiz__invite-sub">全部で{questions.length}問</p>
+               </div>
+               <div className="nameplate-quiz__invite-qr">
+                 <span className="nameplate-quiz__invite-qr-label">SCAN ME</span>
+                 {/* /public/QR_dark.png, /public/QR_light.png を themeMode で切り替え */}
+                 <img
+                   src={theme.qr}
+                   alt="クイズ参加用QRコード"
+                   className="nameplate-quiz__invite-qr-img"
+                  />
+               </div>
+             </div>
+            
+             
+           </>
           ) : progress.phase === 'idle' ? (
             <div className="nameplate-quiz__start-view">
               <p className="nameplate-quiz__start-desc">銘板アイコンクイズ（全{questions.length}問）</p>
@@ -380,6 +423,28 @@ useEffect(() => {
             </div>
           )}
         </div>
+        {!isMobile && (
+         <img
+          src={theme.mobile}
+          alt="モバイル版クイズ画面のイメージ"
+          className="nameplate-quiz__mobile-preview"
+         />
+        )}
+        {!isMobile && (
+          // ---- モニタ表示：下段にカテゴリ別・日別正解率のグラフ ----
+          
+          <div className="nameplate-quiz__trend">
+            <AdminResultsPanel
+              theme={theme}
+              questions={questions}
+              themeMode={themeMode}
+              dateOptions={dateOptions}
+              getBreakdown={getBreakdown}
+              getDailyCorrectRates={getDailyCorrectRates}
+              embedded
+            />
+          </div>
+        )}
       </div>
 
       {isAdminOpen && (

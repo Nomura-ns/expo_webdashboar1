@@ -1,6 +1,61 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { Theme, PageKey } from '../../types'
 import { PAGES } from './themes'
 import { useIsMobile } from '../../hooks/useMediaQuery'
+import { PanelLeft } from 'lucide-react';
+
+// =============================================
+// ミニプレビュー用サムネイル枠
+// 枠の実サイズと中身の自然なサイズをResizeObserverで実測し、
+// X軸・Y軸それぞれ独立の倍率で「枠にぴったりフィット」させる。
+// ページごとに中身の縦横比が違っても対応でき、画面サイズが
+// 変わってもリアルタイムに追従する。
+// =============================================
+function PreviewThumb({ children }: { children: React.ReactNode }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState({ x: 1, y: 1 })
+
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const inner = innerRef.current
+    if (!box || !inner) return
+
+    const measure = () => {
+      // 実測の前に一旦transformを外して「中身の自然なサイズ」を取得する
+      inner.style.transform = 'none'
+      const boxRect = box.getBoundingClientRect()
+      const innerRect = inner.getBoundingClientRect()
+      if (innerRect.width === 0 || innerRect.height === 0) return
+      setScale({
+        x: boxRect.width / innerRect.width,
+        y: boxRect.height / innerRect.height,
+      })
+    }
+
+    measure()
+
+    const ro = new ResizeObserver(measure)
+    ro.observe(box)
+    ro.observe(inner)
+    return () => ro.disconnect()
+  }, [children])
+
+  return (
+    <div ref={boxRef} style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      <div
+        ref={innerRef}
+        style={{
+          display: 'inline-block',
+          transform: `scale(${scale.x}, ${scale.y})`,
+          transformOrigin: 'top left',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
 
 // =============================================
 // ミニプレビュー
@@ -467,6 +522,13 @@ type Props = {
   onPageChange: (page: PageKey) => void
   onClose: () => void
   onToggle: () => void
+  /**
+   * 画面下部に固定フッターがある場合、その高さ(px)。
+   * これを渡すとサイドバーパネルがフッターの上でぴったり止まり、
+   * 一番下のミニプレビューがフッターの裏に隠れなくなる。
+   * フッター側のpadding/フォントサイズを変えた場合はこの値も一緒に見直すこと。
+   */
+  footerHeight?: number
 }
 
 export default function Sidebar({
@@ -476,6 +538,7 @@ export default function Sidebar({
   onPageChange,
   onClose,
   onToggle,
+  footerHeight = 30, // padding 3px*2 + 20pxテキストの行送り分の概算値
 }: Props) {
 
   const isMobile = useIsMobile()
@@ -550,8 +613,8 @@ export default function Sidebar({
       {/* ブックマークタブ */}
       <div style={{
         position: 'fixed',
-        top: '57px',
-        left: sidebarOpen ? '223px' : '0px',
+        top: '78px',
+        left: sidebarOpen ? '200px' : '-22px',
         display: 'flex', flexDirection: 'column',
         alignItems: 'flex-start',
         paddingTop: '20px',
@@ -559,25 +622,30 @@ export default function Sidebar({
         transition: 'left 0.3s ease',
       }}>
         <div
-          onClick={onToggle}
-          onMouseEnter={handleSidebarMouseEnter}
-          style={{
-           width: '80px', height: '26px',
-           background: sidebarOpen ? theme.accent : theme.surface,
-           color: sidebarOpen ? '#fff' : theme.subtext,
-           border: `1px solid ${sidebarOpen ? theme.accent : theme.border}`,
-           borderRadius: '6px 6px 0 0',
-           display: 'flex', alignItems: 'center', justifyContent: 'center',
-           fontSize: '13px', fontWeight: 'bold',
-           cursor: 'pointer',
-           transition: 'all 0.2s',
-           transform: 'rotate(90deg) translateX(48px) translateY(70px)',
-           transformOrigin: 'right center',
-           whiteSpace: 'nowrap',
-          }}
-        >
-          画面切替
-        </div>
+  onClick={onToggle}
+  onMouseEnter={handleSidebarMouseEnter}
+  style={{
+    width: '110px', height: '40px',
+    background: sidebarOpen ? theme.accent : theme.surface,
+    color: sidebarOpen ? '#fff' : theme.subtext,
+    border: `1px solid ${sidebarOpen ? theme.accent : theme.border}`,
+    borderRadius: '6px 6px 0 0',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: '4px',
+    fontSize: '18px', fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    transform: 'rotate(90deg) translateX(48px) translateY(70px)',
+    transformOrigin: 'right center',
+    whiteSpace: 'nowrap',
+  }}
+>
+  <PanelLeft
+    size={14}
+    style={{ transform: 'rotate(-90deg)' }}
+  />
+  画面切替
+</div>
       </div>
 
       {/* スライドパネル */}
@@ -585,57 +653,80 @@ export default function Sidebar({
        onMouseLeave={onClose}
        style={{
         position: 'fixed', top: '57px', left: 0,
-        height: '100vh', width: sidebarOpen ? '220px' : '0px',
+        bottom: `${footerHeight}px`, width: sidebarOpen ? '220px' : '0px',
         background: theme.surface,
         borderRight: sidebarOpen ? `1px solid ${theme.border}` : 'none',
         overflow: 'hidden',
         transition: 'width 0.3s ease',
         zIndex: 40,
+        display: 'flex',
+        flexDirection: 'column',
       }}>
-        <div style={{ padding: '12px 8px', minWidth: '200px' }}>
-          <p style={{ fontSize: '11px', color: theme.subtext, margin: '0 0 10px 4px', letterSpacing: '0.1em' }}>
+        <div style={{
+          padding: '12px 8px 8px', minWidth: '200px',
+          display: 'flex', flexDirection: 'column',
+          flex: 1, minHeight: 0,
+        }}>
+          <p style={{
+            fontSize: '11px', color: theme.subtext, margin: '0 0 10px 4px',
+            letterSpacing: '0.1em', flexShrink: 0,
+          }}>
             ページ切り替え
           </p>
-          {PAGES.map(page => (
-            <div
-              key={page.key}
-              onClick={() => { onPageChange(page.key); onClose() }}
-              style={{
-                marginBottom: '12px',
-                cursor: 'pointer',
-                borderRadius: '8px',
-                border: `1px solid ${currentPage === page.key ? theme.accent : 'transparent'}`,
-                background: currentPage === page.key ? `${theme.accent}11` : 'transparent',
-                padding: '6px',
-                transition: 'all 0.2s',
-              }}
-            >
-              {/* ページ名 */}
-              <div style={{
-                padding: '2px 4px', fontSize: '12px',
-                color: currentPage === page.key ? theme.accent : theme.text,
-                fontWeight: currentPage === page.key ? 'bold' : 'normal',
-                display: 'flex', alignItems: 'center', gap: '6px',
-                marginBottom: '4px',
-              }}>
-                <span style={{
-                  width: '6px', height: '6px', borderRadius: '50%',
-                  background: currentPage === page.key ? theme.accent : theme.subtext,
-                  flexShrink: 0,
-                }} />
-                {page.label}
-              </div>
 
-              {/* ミニプレビュー */}
-              <div style={{
-                borderRadius: '6px', overflow: 'hidden',
-                border: `1px solid ${theme.border}`,
-                opacity: 0.85,
-              }}>
-                {renderPreview(page.key)}
+          {/* ページ一覧：flexで縦方向を均等分割 → 画面サイズが変わっても
+              常にPAGES.length枚ぶん(=4枚)が枠内に収まる。スクロールも不要。 */}
+          <div style={{
+            flex: 1, minHeight: 0,
+            display: 'flex', flexDirection: 'column', gap: '8px',
+          }}>
+            {PAGES.map(page => (
+              <div
+                key={page.key}
+                onClick={() => { onPageChange(page.key); onClose() }}
+                style={{
+                  flex: 1, minHeight: 0,
+                  display: 'flex', flexDirection: 'column',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  border: `1px solid ${currentPage === page.key ? theme.accent : 'transparent'}`,
+                  background: currentPage === page.key ? `${theme.accent}11` : 'transparent',
+                  padding: '6px',
+                  transition: 'all 0.2s',
+                }}
+              >
+                {/* ページ名 */}
+                <div style={{
+                  padding: '2px 4px', fontSize: '12px',
+                  color: currentPage === page.key ? theme.accent : theme.text,
+                  fontWeight: currentPage === page.key ? 'bold' : 'normal',
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  marginBottom: '4px',
+                  flexShrink: 0,
+                }}>
+                  <span style={{
+                    width: '6px', height: '6px', borderRadius: '50%',
+                    background: currentPage === page.key ? theme.accent : theme.subtext,
+                    flexShrink: 0,
+                  }} />
+                  {page.label}
+                </div>
+
+                {/* ミニプレビュー：枠の幅・高さにぴったりフィットさせる */}
+                <div style={{
+                  flex: 1, minHeight: 0,
+                  overflow: 'hidden',
+                  borderRadius: '6px',
+                  border: `1px solid ${theme.border}`,
+                  opacity: 0.7,
+                }}>
+                  <PreviewThumb>
+                    {renderPreview(page.key)}
+                  </PreviewThumb>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 

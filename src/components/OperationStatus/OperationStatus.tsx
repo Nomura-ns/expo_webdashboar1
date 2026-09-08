@@ -1,38 +1,49 @@
 // OperationStatus.tsx
-import { useState } from 'react'
 import PanelFrame from '../common/PanelFrame'
 import type { Theme } from '../../types'
 
-import RobotJointCallout, {
-  type JointPosition,
-  type ChipPosition,
-  type ChipLayout,
-} from './RobotJointCallout'
-import CycleTimeDisplay from './CycleTimeDisplay'
+import ArmDiagram, { type ArmJointPosition } from './ArmDiagram'
+import UtilizationRateDisplay from './UtilizationRateDisplay'
+import TorqueUsageChart, { type AxisTorqueRow } from './TorqueUsageChart'
+import SpeedGaugeGrid, { type AxisSpeedRow } from './SpeedGaugeGrid'
 
 import './OperationStatus.css'
 
-export interface MotorStat {
-  speed: number
-  torque: number
+export interface AxisStat {
+  speed: number // MAX比(%)。PLC対象外のためサンプル値運用（config/robotStatusAddresses.ts 参照）
+  torque: number // 定格トルク比(%)。PLC(Dレジスタ、未定)から取得予定
+  /** トルクのピーク値（%）。PLC(Dレジスタ、未定)から取得予定 */
+  peakTorque: number
 }
 
+export type RobotKey = 'RB1' | 'RB2'
+
 export interface RobotStat {
-  motors: MotorStat[] // 長さ6を想定（A-1〜A-6 / B-1〜B-6）
-  imageUrl?: string
+  motors: AxisStat[] // 長さ6を想定（RB1-1〜RB1-6 / RB2-1〜RB2-6）
+  /** 稼働率（PLC由来。%）。Dレジスタのアドレスは config/robotStatusAddresses.ts を参照 */
+  utilizationRate: number
 }
 
 interface OperationStatusProps {
   theme: Theme
-  robotA: RobotStat
-  robotB: RobotStat
-  cycleTime: number
+  /** ライト/ダークの判定（QRコード画像の出し分けに使用） */
+  themeMode?: 'light' | 'dark'
+  /** RB1・RB2は同一機種のため、アーム図・画像は1台分のみ表示するが、
+   *  しきい値の状態はRB1・RB2の2台分をそれぞれ表示する */
+  imageUrl?: string
+  robotRB1: RobotStat
+  robotRB2: RobotStat
+  /** 現状このページでは非表示（稼働実績ページ側で表示）。互換性のためpropsは残す */
+  cycleTime?: number
   isEditing: boolean
   onEditingChange: (value: boolean) => void
 }
 
-// 軸(1〜6)の画像上の初期位置（%）。実際に差し替える画像に合わせて微調整してください。
-const DEFAULT_JOINT_POSITIONS: JointPosition[] = [
+// しきい値（トルク・速度どちらも同じ%で判定）
+const THRESHOLD = 80
+
+// アーム図：軸(1〜6)の位置（%）。RB1/RB2で共通のシンプルなschematic用の座標。
+const JOINT_POSITIONS: ArmJointPosition[] = [
   { axis: 1, x: 58, y: 82 },
   { axis: 2, x: 68, y: 49 },
   { axis: 3, x: 71, y: 35 },
@@ -41,224 +52,83 @@ const DEFAULT_JOINT_POSITIONS: JointPosition[] = [
   { axis: 6, x: 26, y: 21 },
 ]
 
-// チップ（速度・トルク表示）の初期位置（%、ラッパー全体基準）
-const DEFAULT_CHIP_POSITIONS: ChipPosition[] = [
-  { axis: 1, x: 28, y: 92 },
-  { axis: 2, x: 72, y: 92 },
-  { axis: 3, x: 94, y: 64 },
-  { axis: 4, x: 94, y: 36 },
-  { axis: 5, x: 72, y: 6 },
-  { axis: 6, x: 28, y: 6 },
-]
+// QRコード画像。ダーク/ライトのテーマに応じて出し分ける（配置予定：/public 直下）
+const QR_CODE_URL = {
+  light: 'QR_light.png',
+  dark: 'QR_dark.png',
+}
 
-type RobotKey = 'A' | 'B'
+export default function OperationStatus({
+  theme,
+  themeMode = 'dark',
+  robotRB1,
+  robotRB2,
+  isEditing,
+  onEditingChange,
+}: OperationStatusProps) {
+  const axisCount = Math.max(robotRB1.motors.length, robotRB2.motors.length, 6)
 
-export default function OperationStatus({ theme, robotA, robotB, cycleTime, isEditing, onEditingChange, }: OperationStatusProps) {
-  // A・Bそれぞれ独立して動かせるように分離
-  const [jointPositionsA, setJointPositionsA] = useState<JointPosition[]>(DEFAULT_JOINT_POSITIONS)
-  const [jointPositionsB, setJointPositionsB] = useState<JointPosition[]>(DEFAULT_JOINT_POSITIONS)
-  const [chipPositionsA, setChipPositionsA] = useState<ChipPosition[]>(DEFAULT_CHIP_POSITIONS)
-  const [chipPositionsB, setChipPositionsB] = useState<ChipPosition[]>(DEFAULT_CHIP_POSITIONS)
-  const [chipLayout, setChipLayout] = useState<ChipLayout>('row2')
+  const torqueRows: AxisTorqueRow[] = Array.from({ length: axisCount }, (_, i) => ({
+    axis: i + 1,
+    rb1: {
+      value: robotRB1.motors[i]?.torque ?? 0,
+      peak: robotRB1.motors[i]?.peakTorque ?? 0,
+    },
+    rb2: {
+      value: robotRB2.motors[i]?.torque ?? 0,
+      peak: robotRB2.motors[i]?.peakTorque ?? 0,
+    },
+  }))
 
-  // 編集パネルで今どちらのロボットを編集中か（タブ切り替え）
-  const [selectedRobot, setSelectedRobot] = useState<RobotKey>('A')
+  const speedRows: AxisSpeedRow[] = Array.from({ length: axisCount }, (_, i) => ({
+    axis: i + 1,
+    rb1: robotRB1.motors[i]?.speed ?? 0,
+    rb2: robotRB2.motors[i]?.speed ?? 0,
+  }))
 
-  const resetAxis = (robot: RobotKey, axis: number) => {
-    const defJoint = DEFAULT_JOINT_POSITIONS.find((d) => d.axis === axis)
-    const defChip = DEFAULT_CHIP_POSITIONS.find((d) => d.axis === axis)
-    const setJointPositions = robot === 'A' ? setJointPositionsA : setJointPositionsB
-    const setChipPositions = robot === 'A' ? setChipPositionsA : setChipPositionsB
-    if (defJoint) setJointPositions((prev) => prev.map((p) => (p.axis === axis ? defJoint : p)))
-    if (defChip) setChipPositions((prev) => prev.map((p) => (p.axis === axis ? defChip : p)))
-  }
+  // アーム図に出す軸ごとのしきい値超過フラグ（RB1・RB2それぞれ独立に判定）
+  const warnByAxis = torqueRows.map((row) => ({
+    rb1: row.rb1.peak >= THRESHOLD,
+    rb2: row.rb2.peak >= THRESHOLD,
+  }))
 
-  const resetAllRobot = (robot: RobotKey) => {
-    if (robot === 'A') {
-      setJointPositionsA(DEFAULT_JOINT_POSITIONS)
-      setChipPositionsA(DEFAULT_CHIP_POSITIONS)
-    } else {
-      setJointPositionsB(DEFAULT_JOINT_POSITIONS)
-      setChipPositionsB(DEFAULT_CHIP_POSITIONS)
-    }
-  }
-
-  const resetAll = () => {
-    resetAllRobot('A')
-    resetAllRobot('B')
-  }
-
-  const currentJointPositions = selectedRobot === 'A' ? jointPositionsA : jointPositionsB
+  const qrUrl = themeMode === 'light' ? QR_CODE_URL.light : QR_CODE_URL.dark
 
   return (
     <PanelFrame className={`op-status op-status--${theme}`}>
-      <div className={`op-status__layout${isEditing ? ' is-editing' : ''}`}>
-        <div className="op-status__main">
-          {/* サイクルタイム（A・B合算）：左上にコンパクト表示 */}
-          <div className="op-status__cycle-corner">
-            <div className="op-status__title op-status__title--inline">サイクルタイム</div>
-            <CycleTimeDisplay seconds={cycleTime} />
+      <div className="op-status__layout">
+        <div className="op-status__main-row">
+          <div className="op-status__card op-status__card--arm">
+            <div className="op-status__title">アーム構成</div>
+            <ArmDiagram jointPositions={JOINT_POSITIONS} warnByAxis={warnByAxis} />
           </div>
 
-          {/* ロボットA/B：画像 + 軸ごとの速度・トルクチップ（引き出し線付き・自由配置） */}
-          <div className="op-status__row">
-            <div className="op-status__card">
-              {/* タイトルをクリックすると編集パネル側のタブも連動して切り替わる */}
-              <div
-                className={`op-status__title${isEditing ? ' op-status__title--selectable' : ''}${isEditing && selectedRobot === 'A' ? ' is-selected' : ''}`}
-                onClick={() => isEditing && setSelectedRobot('A')}
-                role={isEditing ? 'button' : undefined}
-                tabIndex={isEditing ? 0 : undefined}
-              >
-                ロボットA 速度・トルク
-              </div>
-              <RobotJointCallout
-                prefix="A"
-                imageUrl={robotA.imageUrl}
-                motors={robotA.motors}
-                jointPositions={jointPositionsA}
-                chipPositions={chipPositionsA}
-                chipLayout={chipLayout}
-                isEditing={isEditing}
-                onJointPositionsChange={setJointPositionsA}
-                onChipPositionsChange={setChipPositionsA}
-              />
-            </div>
-            <div className="op-status__card">
-              <div
-                className={`op-status__title${isEditing ? ' op-status__title--selectable' : ''}${isEditing && selectedRobot === 'B' ? ' is-selected' : ''}`}
-                onClick={() => isEditing && setSelectedRobot('B')}
-                role={isEditing ? 'button' : undefined}
-                tabIndex={isEditing ? 0 : undefined}
-              >
-                ロボットB 速度・トルク
-              </div>
-              <RobotJointCallout
-                prefix="B"
-                imageUrl={robotB.imageUrl}
-                motors={robotB.motors}
-                jointPositions={jointPositionsB}
-                chipPositions={chipPositionsB}
-                chipLayout={chipLayout}
-                isEditing={isEditing}
-                onJointPositionsChange={setJointPositionsB}
-                onChipPositionsChange={setChipPositionsB}
-              />
+          <div className="op-status__card op-status__card--torque">
+            <TorqueUsageChart data={torqueRows} threshold={THRESHOLD} />
+          </div>
+
+          <div className="op-status__card op-status__card--util">
+            <div className="op-status__title">ROBOT 稼働率</div>
+            <div className="op-status__util-row">
+              <UtilizationRateDisplay label="RB1" rate={robotRB1.utilizationRate} colorKey="RB1" />
+              <UtilizationRateDisplay label="RB2" rate={robotRB2.utilizationRate} colorKey="RB2" />
             </div>
           </div>
         </div>
 
+        <div className="op-status__card op-status__card--speed">
+          <SpeedGaugeGrid data={speedRows} threshold={THRESHOLD} />
+          <img src={qrUrl} alt="QRコード" className="op-status__qr" />
+        </div>
+
+        {/* 編集モード：新レイアウト（バー/ドーナツ/ゲージ表示）向けの位置編集UIは未実装。
+            トグル自体はSettingsPanelと同期を取るため残してあります。 */}
         {isEditing && (
-          <div className="op-status__edit-panel">
-            <div className="op-status__edit-panel-scroll">
-              {/* 編集モードトグル（設定パネルと同期） */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-                <span style={{ fontSize: '14px', color: theme.text }}>編集モード</span>
-
-                <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
-                  <input
-                    type="checkbox"
-                    checked={isEditing}
-                    onChange={(e) => onEditingChange(e.target.checked)}
-                    style={{ opacity: 0, width: 0, height: 0 }}
-                  />
-                  <span
-                    style={{
-                      position: 'absolute',
-                      cursor: 'pointer',
-                      top: 0, left: 0, right: 0, bottom: 0,
-                      backgroundColor: isEditing ? theme.accent : '#ccc',
-                      borderRadius: '24px',
-                      transition: '0.2s',
-                    }}
-                  >
-                    <span
-                      style={{
-                        position: 'absolute',
-                        height: '18px',
-                        width: '18px',
-                        left: isEditing ? '23px' : '3px',
-                        bottom: '3px',
-                        backgroundColor: '#fff',
-                        borderRadius: '50%',
-                        transition: '0.2s',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                      }}
-                    />
-                  </span>
-                </label>
-
-                <span style={{ fontSize: '13px', color: theme.text }}>
-                  {isEditing ? 'ON' : 'OFF'}
-                </span>
-              </div>
-
-              <section className="op-status__panel-section">
-                <h3>チップ表示</h3>
-                <div className="op-status__edit-group">
-                  {(['row2', 'row3'] as ChipLayout[]).map((l) => (
-                    <button
-                      key={l}
-                      type="button"
-                      className={`op-status__chip-opt${chipLayout === l ? ' is-active' : ''}`}
-                      onClick={() => setChipLayout(l)}
-                    >
-                      {l === 'row2' ? '2段構成（ラベル / 速度+トルク）' : '3段構成（ラベル / 速度 / トルク）'}
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="op-status__panel-section">
-                <h3>編集対象ロボット</h3>
-                <div className="op-status__robot-tabs">
-                  <button
-                    type="button"
-                    className={`op-status__robot-tab${selectedRobot === 'A' ? ' is-active' : ''}`}
-                    onClick={() => setSelectedRobot('A')}
-                  >
-                    ロボットA
-                  </button>
-                  <button
-                    type="button"
-                    className={`op-status__robot-tab${selectedRobot === 'B' ? ' is-active' : ''}`}
-                    onClick={() => setSelectedRobot('B')}
-                  >
-                    ロボットB
-                  </button>
-                </div>
-              </section>
-
-              <section className="op-status__panel-section">
-                <h3>ロボット{selectedRobot}：軸ごとの位置</h3>
-                <div className="op-status__edit-group">
-                  {currentJointPositions.map((j) => (
-                    <div key={j.axis} className="op-status__axis-row">
-                      <span className="op-status__axis-row-label">軸 {j.axis}</span>
-                      <button
-                        type="button"
-                        className="op-status__axis-reset"
-                        onClick={() => resetAxis(selectedRobot, j.axis)}
-                      >
-                        位置をリセット
-                      </button>
-                    </div>
-                  ))}
-                </div>
-                <p className="op-status__panel-hint">
-                  画像上のマーカーとチップをそれぞれドラッグして自由に配置できます。点線は自動で追従します。A・Bは独立して配置を保持します。
-                </p>
-                <button type="button" className="op-status__reset-all" onClick={() => resetAllRobot(selectedRobot)}>
-                  ロボット{selectedRobot}をすべてリセット
-                </button>
-              </section>
-
-              <section className="op-status__panel-section">
-                <button type="button" className="op-status__reset-all" onClick={resetAll}>
-                  すべての位置をリセット（A・B両方）
-                </button>
-              </section>
-            </div>
+          <div className="op-status__edit-note">
+            編集モード：このページの表示位置編集は現在準備中です。
+            <button type="button" onClick={() => onEditingChange(false)}>
+              編集モードを終了
+            </button>
           </div>
         )}
       </div>

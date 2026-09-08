@@ -241,6 +241,33 @@
   fill: var(--nq-text, #f1f5f9);
 }
 
+/* ---- カテゴリ別グループ棒グラフの凡例（モニタ表示用） ---- */
+.admin-panel__legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(10px, 1.4vw, 20px);
+  margin-top: clamp(8px, 1.2vw, 16px);
+  flex: 0 0 auto;
+}
+
+.admin-panel__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: clamp(12px, 1.1vw, 16px);
+  color: var(--nq-subtext, #94a3b8);
+  white-space: nowrap;
+}
+
+.admin-panel__legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
 .admin-panel__modal--embedded .admin-panel__chart-x-label {
   font-size: clamp(13px, 1.3vw, 20px);
 }
@@ -346,9 +373,11 @@
 }
 
 .admin-panel__modal--embedded .admin-panel__chart {
-      flex: 1 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
-  height: 100%;
+  width: 100%;
+  aspect-ratio: 1200 / 260;   /* ← 追加。chartW / chartH と必ず一致させる */
+  height: auto;                /* ← height: 100% から変更。aspect-ratioに高さを委ねる */
 }
 
 /* ---- 棒グラフ（ロック画面用） ---- */

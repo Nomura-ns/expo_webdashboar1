@@ -1,329 +1,458 @@
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { Theme } from '../../types'
-import { JOB_MAP } from '../../config/jobDefinitions'
 import './JobFlowDiagram.css'
 
-interface FlowNode {
+interface FlowNodeDef {
   id: string
-  jobId?: string
+  kind: 'process' | 'decision' | 'terminal'
+  /** ラベル文字列。"\n" で改行 */
   label: string
-  kind?: 'decision'
   /**
-   * PLCのD100（現在工程ステップ）などから送られてくる値と対応させるコード。
-   * 実際のPLC側のステップ値に合わせて書き換えてください。
+   * PLCの現在ステップレジスタ（D100など、アドレス未定）と対応させる仮番号。
+   * 実アドレス確定後、PLC側の実際のステップ値に合わせて書き換えてください。
+   * 全体フロー=1〜、RB1フロー=21〜、RB2フロー=31〜 の範囲で仮採番しています。
    */
   plcStep?: number
 }
 
-const SETTING_FLOW: FlowNode[] = [
-  { id: 'set-1', jobId: 'pick-store',    label: '上刃ピック',      plcStep: 1 },
-  { id: 'set-2', jobId: 'insert-fit',    label: '挿入・勘合',      plcStep: 2 },
-  { id: 'set-3', jobId: 'position',      label: '撮影・位置決め',  plcStep: 3 },
-  { id: 'set-4', jobId: 'screw-tighten', label: 'ネジ締め',        plcStep: 4 },
+/** 判定結果の色（テーマに依存せず固定。うっすら赤＝異常系の視認性を優先） */
+const OK_COLOR = '#4fbf8f'
+const NG_COLOR = '#d9713c'
+
+// ── ①全体フロー（フロー画面草案.pdf「全体」を参照） ─────────────────────
+// 刃物取付 → インターバル → 刃物取外 → 検査 → 検査結果OK？
+//   YES（OK） … 刃物交換を飛ばして「刃物ストックへ返却」へ
+//   NO （NG） … 刃物交換 → 刃物ストックへ返却
+// → 動作準備 → （先頭「刃物取付」へループ）
+//
+// 修正依頼（草案PDF）により、検査結果とその後の工程は「判明してから表示する」
+// 方式に変更。そのため刃物交換のみ判定結果に応じて出し入れする分岐ノードとして扱う。
+const OVERALL_FLOW: FlowNodeDef[] = [
+  { id: 'ov-1', kind: 'process', label: '刃物取付', plcStep: 1 },
+  { id: 'ov-2', kind: 'process', label: 'インターバル', plcStep: 2 },
+  { id: 'ov-3', kind: 'process', label: '刃物取外', plcStep: 3 },
+  { id: 'ov-4', kind: 'process', label: '検査', plcStep: 4 },
+  { id: 'ov-d', kind: 'decision', label: '検査結果\nOK？', plcStep: 5 },
+  { id: 'ov-5', kind: 'process', label: '刃物交換', plcStep: 6 },
+  { id: 'ov-6', kind: 'process', label: '刃物ストックへ\n返却', plcStep: 7 },
+  { id: 'ov-7', kind: 'process', label: '動作準備', plcStep: 8 },
+]
+const OVERALL_DECISION_STEP = OVERALL_FLOW.find((n) => n.id === 'ov-d')!.plcStep!
+
+// ── ②RB1フロー ────────────────────────────────────────────────
+const RB1_FLOW: FlowNodeDef[] = [
+  { id: 'rb1-s', kind: 'terminal', label: 'START' },
+  { id: 'rb1-1', kind: 'process', label: '下刃撮像', plcStep: 21 },
+  { id: 'rb1-2', kind: 'process', label: '上刃取付開始', plcStep: 22 },
+  { id: 'rb1-3', kind: 'process', label: '嵌合動作', plcStep: 23 },
+  { id: 'rb1-4', kind: 'process', label: '上刃位置確認', plcStep: 24 },
+  { id: 'rb1-d', kind: 'decision', label: '設定個数\n到達？', plcStep: 25 },
+  { id: 'rb1-e', kind: 'terminal', label: 'END' },
 ]
 
-const EXTRACTION_FLOW: FlowNode[] = [
-  { id: 'ext-1', jobId: 'pick-store',    label: '使用刃つかみ',    plcStep: 11 },
-  { id: 'ext-2', jobId: 'screw-loosen',  label: 'ネジ緩め',        plcStep: 12 },
-  { id: 'ext-3', jobId: 'inspect',       label: '検査',            plcStep: 13 },
-  { id: 'ext-d', jobId: 'sort',          label: 'OK / NG', kind: 'decision', plcStep: 14 },
-  { id: 'ext-4', jobId: 'lid',           label: '蓋開',            plcStep: 15 },
-  { id: 'ext-5', jobId: 'exchange',      label: '刃交換',          plcStep: 16 },
-  { id: 'ext-6', jobId: 'lid',           label: '蓋閉',            plcStep: 17 },
-  { id: 'ext-7', jobId: 'ring-spring',   label: 'リング着脱',      plcStep: 18 },
-  { id: 'ext-8', jobId: 'pick-store',    label: '格納・ストック',  plcStep: 19 },
+// ── ③RB2フロー ────────────────────────────────────────────────
+const RB2_FLOW: FlowNodeDef[] = [
+  { id: 'rb2-s', kind: 'terminal', label: 'START' },
+  { id: 'rb2-1', kind: 'process', label: 'ねじ締めを行う', plcStep: 31 },
+  { id: 'rb2-d', kind: 'decision', label: '設定個数\n到達？', plcStep: 32 },
+  { id: 'rb2-e', kind: 'terminal', label: 'END' },
 ]
 
-interface JobFlowDiagramProps {
-  theme: Theme
-  activeStep?: number
-  cycleCurrent?: number
-  cycleTotal?: number
-  /** ジョブ実行回数タブの色編集で上書きされた色（jobId → color） */
-  colorOverrides?: Record<string, string>
-}
-
-// ── レイアウト定数（フォントサイズに合わせて余白を確保） ──
-const BOX_W = 650
-const BOX_H = 85
-const ROW_GAP = 40              // 同フェーズ内、矢印分のギャップ
-const STEP = BOX_H + ROW_GAP    // ノード間の縦ステップ
-const MARGIN_X = 35
-const TITLE_GAP = 40            // タイトルから最初のボックスまで
-const PHASE_END_GAP = 32        // フェーズ末尾ボックス → 区切りテキストまで
-const DIVIDER_TO_TITLE_GAP = 56 // 区切りテキスト → 次フェーズタイトルまで
-const TITLE_TO_BOX_GAP = 40     // 次フェーズタイトル → 最初のボックスまで
-
-// ── ループ矢印（曲線）の調整用パラメータ ──
-// 各ループ矢印は「開始点 → 終了点」を結ぶベジェ曲線です。
-// - bulge      : 曲線がどれだけ横に膨らむか（px）。大きいほど弧が大きくなる
-// - ctrl1Ratio : 開始点側の制御点を、開始〜終了の縦距離のどの位置に置くか（0=開始点と同じ高さ）
-// - ctrl2Ratio : 終了点側の制御点を、同じく縦距離のどの位置に置くか（1=終了点と同じ高さ）
-// 縦距離（ノード数）が違うループでも見た目のバランスが取れるよう、
-// それぞれ個別に数値を変えて調整してください。
-// ── ♦（分岐）の頂点がボックスの上下端からどれだけ外側に飛び出すか ──
-// renderBox内のpolygon座標と、下のDECISION_ARROW_CONFIGの両方から参照する共通値。
-const DIAMOND_TOP_INSET = 5    // 上頂点が n.y からどれだけ上に飛び出すか
-const DIAMOND_BOTTOM_INSET = 2 // 下頂点が n.y+BOX_H からどれだけ下に飛び出すか
-
-// ── ♦に入る矢印／♦から出る矢印の長さ調整用パラメータ ──
-// ♦は上下の頂点がボックス枠より外側に飛び出しているため、通常のボックス間矢印と
-// 同じ計算だと「矢印の先端が♦の下に隠れる」「♦との間に隙間ができる」ことがあります。
-// ここを個別に調整してください（pxの数値。プラスにするほど矢印は短く＝隙間が増え、
-// マイナスにするほど矢印は長く＝♦に食い込みます）。
-const DECISION_ARROW_CONFIG = {
-  intoGap: 30,  // 手前のボックス →♦ に入る矢印。0で♦の上頂点にぴったり届く
-  outGap: -30,   // ♦ → 次のボックス に出る矢印（NG方向）。0で♦の下頂点からぴったり始まる
-}
-
-const LOOP_CONFIG = {
-  // ①セッティングフェーズ：先頭ノードへ戻る矢印（4ノード分）
-  settingLoop: {
-    bulge: 90,
-    ctrl1Ratio: 0.2,
-    ctrl2Ratio: 0.8,
-  },
-  // ②取出しフェーズ：先頭ノードへ戻る矢印（9ノード分、縦に長い）
-  extractionLoop: {
-    bulge: 130,
-    ctrl1Ratio: 0.12,
-    ctrl2Ratio: 0.88,
-  },
-  // OK分岐：検査ノードから格納ノードまで右側を迂回する矢印
-  decisionBranch: {
-    bulge: 50,
-    ctrl1Ratio: 0.1,
-    ctrl2Ratio: 0.9,
-  },
+/** 「n/m工程」の進捗を、plcStepを持つノードの数から計算する */
+function computeProgress(nodes: FlowNodeDef[], activeStep: number | undefined, totalOverride?: number) {
+  const stepped = nodes.filter((n) => n.plcStep !== undefined)
+  const total = totalOverride ?? stepped.length
+  if (activeStep === undefined) return { current: 0, total }
+  let current = 0
+  stepped.forEach((n, i) => {
+    if (n.plcStep! <= activeStep) current = i + 1
+  })
+  return { current, total }
 }
 
 /**
- * 縦方向に離れた2点を、左右どちらかに膨らむベジェ曲線でつなぐパスを生成します。
- * direction: -1 = 左に膨らむ（戻りループ用）, 1 = 右に膨らむ（OK分岐用）
+ * 全体フローの表示ノードを、検査結果が判明しているかどうかに応じて組み立てる。
+ * 判明前：検査結果の分岐（◆）まで表示。判明後：NGなら「刃物交換」を挟み、OKなら飛ばす。
+ * 進捗の分母は「基本工程が多いパターン（NG＝8工程）」を初期値とし、
+ * OKと判明した時点で7工程に縮める。
  */
-function bulgeLoopPath(
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number,
-  cfg: { bulge: number; ctrl1Ratio: number; ctrl2Ratio: number },
-  direction: -1 | 1
-) {
-  const dx = cfg.bulge * direction
-  const c1y = startY + (endY - startY) * cfg.ctrl1Ratio
-  const c2y = startY + (endY - startY) * cfg.ctrl2Ratio
-  return `M ${startX} ${startY} C ${startX + dx} ${c1y}, ${endX + dx} ${c2y}, ${endX} ${endY}`
+function resolveOverallFlow(activeStep: number | undefined, ngSignal: boolean | undefined) {
+  const decisionIdx = OVERALL_FLOW.findIndex((n) => n.id === 'ov-d')
+  const resolved = activeStep !== undefined && activeStep > OVERALL_DECISION_STEP
+  const nodes = resolved
+    ? ngSignal
+      ? OVERALL_FLOW
+      : OVERALL_FLOW.filter((n) => n.id !== 'ov-5')
+    : OVERALL_FLOW.slice(0, decisionIdx + 1)
+  const progress = computeProgress(nodes, activeStep, resolved ? undefined : OVERALL_FLOW.length)
+  return { nodes, resolved, progress }
 }
 
-function buildLayout() {
-  const title1Y = TITLE_GAP - 20
-  const settingNodes = SETTING_FLOW.map((n, i) => ({ ...n, y: TITLE_GAP + i * STEP }))
-  const settingBottom = settingNodes[settingNodes.length - 1].y + BOX_H
+// ══════════════════════════════════════════════════════════════════════
+// 共通エンジン：全フロー（全体／RB1／RB2）で同じ形状（矩形・ひし形・端子）を
+// 使う横並びSVG図。ノードごとに必要な行数分の高さ・幅を確保し、ラベルの
+// 被りを防ぐ。戻りループの矢印は使わず、必要な場合は呼び出し側で
+// キャプションテキストとして表示する。
+// ══════════════════════════════════════════════════════════════════════
 
-  const dividerY = settingBottom + PHASE_END_GAP
-  const title2Y = dividerY + DIVIDER_TO_TITLE_GAP
-  const extractionStartY = title2Y + TITLE_TO_BOX_GAP
-
-  const extractionNodes = EXTRACTION_FLOW.map((n, i) => ({ ...n, y: extractionStartY + i * STEP }))
-  const lastNode = extractionNodes[extractionNodes.length - 1]
-  const totalH = lastNode.y + BOX_H + 44
-
-  // 左右のループ矢印（bulge）がSVGの外にはみ出て途切れないよう、
-  // LOOP_CONFIGの値に応じてviewBoxの余白を自動計算する。
-  // bulgeの数値をどれだけ大きくしても、ここで自動的に描画エリアが広がる。
-  const maxLeftBulge = Math.max(LOOP_CONFIG.settingLoop.bulge, LOOP_CONFIG.extractionLoop.bulge)
-  const leftExtra = Math.max(0, maxLeftBulge - MARGIN_X + 15)
-  const rightExtra = Math.max(90, LOOP_CONFIG.decisionBranch.bulge + 60)
-
-  return { title1Y, settingNodes, settingBottom, dividerY, title2Y, extractionStartY, extractionNodes, lastNode, totalH, leftExtra, rightExtra }
+interface SizingConfig {
+  boxW: number
+  boxH: number
+  diamondW: number
+  diamondH: number
+  termW: number
+  termH: number
+  gapX: number
+  leftPad: number
+  rightPad: number
+  topPad: number
+  bottomPad: number
+  lineHeight: number
 }
 
-export default function JobFlowDiagram({theme, activeStep, cycleCurrent, cycleTotal, colorOverrides, }: JobFlowDiagramProps) {
-  const { title1Y, settingNodes, settingBottom, dividerY, title2Y, extractionNodes, lastNode, totalH, leftExtra, rightExtra } = buildLayout()
-  const cx = MARGIN_X + BOX_W / 2
+/** ノード1個あたりの最小幅目安（全角1文字＝約15px、左右余白込み）。ラベルの被りを防ぐため文字数に応じて広げる */
+function estimateNodeWidth(label: string, minWidth: number, charPx = 15, padding = 28) {
+  const longestLine = Math.max(...label.split('\n').map((l) => l.length))
+  return Math.max(minWidth, longestLine * charPx + padding)
+}
 
-  const hasCurrent = typeof cycleCurrent === 'number'
-  const hasTotal = typeof cycleTotal === 'number' && cycleTotal > 0
-  const cyclePct = hasCurrent && hasTotal ? Math.min(100, Math.round((cycleCurrent! / cycleTotal!) * 100)) : 0
-  const cycleCurrentLabel = hasCurrent ? cycleCurrent : '--'
-  const cycleTotalLabel = hasTotal ? cycleTotal : '--'
+const OVERALL_SIZING: SizingConfig = {
+  boxW: 150,
+  boxH: 52,
+  diamondW: 104,
+  diamondH: 78,
+  termW: 76,
+  termH: 36,
+  gapX: 40,
+  leftPad: 16,
+  rightPad: 16,
+  topPad: 18,
+  bottomPad: 18,
+  lineHeight: 16,
+}
 
- const renderBox = (n: { id: string; jobId?: string; label: string; kind?: 'decision'; plcStep?: number; y: number }) => {
-    const job = n.jobId ? JOB_MAP[n.jobId] : undefined
-     const fill = job ? (colorOverrides?.[n.jobId!] ?? job.color) : theme.border
-    const isActive = n.plcStep !== undefined && activeStep !== undefined && n.plcStep === activeStep
-    const strokeColor = isActive ? theme.accent : fill
-    const groupClass = isActive ? 'flow__node flow__node--active' : 'flow__node'
+const ROBOT_SIZING: SizingConfig = {
+  boxW: 128,
+  boxH: 46,
+  diamondW: 100,
+  diamondH: 72,
+  termW: 64,
+  termH: 32,
+  gapX: 34,
+  leftPad: 14,
+  rightPad: 14,
+  topPad: 16,
+  bottomPad: 16,
+  lineHeight: 15,
+}
 
-    if (n.kind === 'decision') {
-      const cyD = n.y + BOX_H / 2
-      const w = BOX_W - 12
-      const points = [
-        [cx, n.y - DIAMOND_TOP_INSET],
-        [cx + w / 2, cyD],
-        [cx, n.y + BOX_H + DIAMOND_BOTTOM_INSET],
-        [cx - w / 2, cyD],
-      ].map((p) => p.join(',')).join(' ')
-      return (
-        <g key={n.id} className={groupClass}>
-          {isActive && (
-            <polygon
-              className="flow__active-glow"
-              points={points}
-              fill="none"
-              stroke={theme.accent}
-              strokeWidth={14}
-            />
-          )}
-          <polygon points={points} fill={theme.surface} stroke={strokeColor} strokeWidth={isActive ? 4 : 1.5} />
-          <text x={cx-3} y={cyD+5} dominantBaseline="middle" textAnchor="middle" className="flow__label" fill={theme.subtext}>
-            {n.label}
-          </text>
-        </g>
-      )
-    }
+interface HorizontalPositioned {
+  node: FlowNodeDef
+  cx: number
+  left: number
+  right: number
+  width: number
+  height: number
+  lines: string[]
+}
+
+function layoutHorizontal(nodes: FlowNodeDef[], s: SizingConfig) {
+  let x = s.leftPad
+  const maxH = Math.max(s.boxH, s.diamondH, s.termH)
+  const rowCenterY = s.topPad + maxH / 2
+  const positioned: HorizontalPositioned[] = nodes.map((node) => {
+    const baseW = node.kind === 'decision' ? s.diamondW : node.kind === 'terminal' ? s.termW : s.boxW
+    const width = node.kind === 'terminal' ? baseW : estimateNodeWidth(node.label, baseW)
+    const height = node.kind === 'decision' ? s.diamondH : node.kind === 'terminal' ? s.termH : s.boxH
+    const left = x
+    const right = x + width
+    const cx = x + width / 2
+    x = right + s.gapX
+    return { node, cx, left, right, width, height, lines: node.label.split('\n') }
+  })
+  const totalW = Math.max(x - s.gapX + s.rightPad, 0)
+  const totalH = s.topPad + maxH + s.bottomPad
+  return { positioned, totalW, totalH, rowCenterY }
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+interface ResolvedChip {
+  nodeId: string
+  label: string
+  color: string
+}
+
+interface FlowCanvasProps {
+  theme: Theme
+  nodes: FlowNodeDef[]
+  sizing: SizingConfig
+  markerId: string
+  activeStep?: number
+  /** 判定確定後、指定ノードを色付きチップ表示に差し替える（全体フローのOK/NG用） */
+  resolvedChip?: ResolvedChip
+  /** ひし形の直後の矢印に添えるラベル（RB1/RB2のYESなど） */
+  decisionForwardLabel?: string
+  /** trueの場合、現在工程が常に見える位置へ自動スライドする */
+  autoSlide?: boolean
+  /** 枠の高さなどを個別指定するための追加クラス名 */
+  scrollClassName?: string
+}
+
+function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChip, decisionForwardLabel, autoSlide, scrollClassName }: FlowCanvasProps) {
+  const { positioned, totalW, totalH, rowCenterY } = layoutHorizontal(nodes, s)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const activeIdx = positioned.findIndex((p) => p.node.plcStep !== undefined && p.node.plcStep === activeStep)
+  const focusTarget = activeIdx >= 0 ? positioned[activeIdx] : undefined
+
+  useEffect(() => {
+    if (!autoSlide) return
+    const el = scrollRef.current
+    const target = focusTarget ?? positioned[positioned.length - 1]
+    if (!el || !target) return
+    const containerW = el.clientWidth || totalW
+    const left = clamp(target.cx - containerW / 2, 0, Math.max(totalW - containerW, 0))
+    el.scrollTo({ left, behavior: 'smooth' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSlide, activeStep, nodes.length])
+
+  const isActive = (p: HorizontalPositioned) => p.node.plcStep !== undefined && activeStep !== undefined && p.node.plcStep === activeStep
+
+  const renderLines = (p: HorizontalPositioned, cx: number, labelClass: string, fill: string) => {
+    const lineDy = s.lineHeight
+    const startDy = -((p.lines.length - 1) * lineDy) / 2
     return (
-      <g key={n.id} className={groupClass}>
-        {isActive && (
-          <rect
-            className="flow__active-glow"
-            x={MARGIN_X - 6}
-            y={n.y - 6}
-            width={BOX_W + 12}
-            height={BOX_H + 12}
-            rx={9}
-            fill="none"
-            stroke={theme.accent}
-            strokeWidth={12}
-          />
-        )}
-        <rect x={MARGIN_X} y={n.y} width={BOX_W} height={BOX_H} rx={5} fill={theme.surface} stroke={strokeColor} strokeWidth={isActive ? 4 : 1.5} />
-        <rect x={MARGIN_X} y={n.y} width={4} height={BOX_H} fill={fill} rx={2} />
-        <text x={cx + 4} y={n.y + BOX_H / 2 + 8} dominantBaseline="middle" textAnchor="middle" className="flow__label" fill={theme.subtext}>
-          {n.label}
+      <text x={cx} y={rowCenterY + startDy} dominantBaseline="middle" textAnchor="middle" className={labelClass} fill={fill}>
+        {p.lines.map((line, li) => (
+          <tspan key={li} x={cx} dy={li === 0 ? 0 : lineDy}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    )
+  }
+
+  const renderChip = (p: HorizontalPositioned, chip: ResolvedChip) => {
+    const y = rowCenterY - p.height / 4
+    const h = p.height / 2
+    return (
+      <g key={p.node.id} className="flow__node">
+        <rect x={p.left} y={y} width={p.width} height={h} rx={h / 2} fill={chip.color} />
+        <text x={p.cx} y={y + h / 2} dominantBaseline="middle" textAnchor="middle" className="flow__terminal-label" fill="#fff">
+          {chip.label}
         </text>
-        {job && (
-          <text x={MARGIN_X + BOX_W - 14} y={n.y + 12} dominantBaseline="hanging" textAnchor="end" className="flow__robot" fill={fill}>
-            {job.robot}
-          </text>
-        )}
       </g>
     )
   }
 
-  const arrowDown = (fromY: number, toY: number, key: string) => (
-    <line key={key} x1={cx+220} y1={fromY} x2={cx+220} y2={toY} stroke={theme.accent} strokeWidth={2.5} markerEnd="url(#flow-arrow)" />
-  )
+  const renderDiamond = (p: HorizontalPositioned) => {
+    const active = isActive(p)
+    const strokeColor = active ? theme.accent : theme.border
+    const groupClass = active ? 'flow__node flow__node--active' : 'flow__node'
+    const points = [
+      [p.left, rowCenterY],
+      [p.cx, rowCenterY - p.height / 2],
+      [p.right, rowCenterY],
+      [p.cx, rowCenterY + p.height / 2],
+    ]
+      .map((pt) => pt.join(','))
+      .join(' ')
+    return (
+      <g key={p.node.id} className={groupClass}>
+        {active && <polygon className="flow__active-glow" points={points} fill="none" stroke={theme.accent} strokeWidth={9} />}
+        <polygon points={points} fill={theme.surface} stroke={strokeColor} strokeWidth={active ? 3 : 1.5} />
+        {renderLines(p, p.cx, 'flow__label flow__label--sm', theme.subtext)}
+      </g>
+    )
+  }
+
+  const renderTerminal = (p: HorizontalPositioned) => {
+    const active = isActive(p)
+    const strokeColor = active ? theme.accent : theme.border
+    const groupClass = active ? 'flow__node flow__node--active' : 'flow__node'
+    const y = rowCenterY - p.height / 2
+    const rx = p.height / 2
+    return (
+      <g key={p.node.id} className={groupClass}>
+        <rect x={p.left} y={y} width={p.width} height={p.height} rx={rx} fill={theme.surface} stroke={strokeColor} strokeWidth={active ? 3 : 1.5} />
+        <text x={p.cx} y={rowCenterY} dominantBaseline="middle" textAnchor="middle" className="flow__terminal-label" fill={theme.subtext}>
+          {p.node.label}
+        </text>
+      </g>
+    )
+  }
+
+  const renderBox = (p: HorizontalPositioned) => {
+    const active = isActive(p)
+    const strokeColor = active ? theme.accent : theme.border
+    const groupClass = active ? 'flow__node flow__node--active' : 'flow__node'
+    const labelClass = p.lines.length > 1 ? 'flow__label flow__label--sm' : 'flow__label'
+    const y = rowCenterY - p.height / 2
+
+    return (
+      <g key={p.node.id} className={groupClass}>
+        {active && (
+          <rect
+            className="flow__active-glow"
+            x={p.left - 5}
+            y={y - 5}
+            width={p.width + 10}
+            height={p.height + 10}
+            rx={7}
+            fill="none"
+            stroke={theme.accent}
+            strokeWidth={8}
+          />
+        )}
+        <rect x={p.left} y={y} width={p.width} height={p.height} rx={5} fill={theme.surface} stroke={strokeColor} strokeWidth={active ? 3 : 1.5} />
+        <rect x={p.left} y={y} width={4} height={p.height} fill={theme.accent} rx={2} />
+        {renderLines(p, p.cx + 3, labelClass, theme.subtext)}
+      </g>
+    )
+  }
+
+  const renderNode = (p: HorizontalPositioned) => {
+    if (resolvedChip && p.node.id === resolvedChip.nodeId) return renderChip(p, resolvedChip)
+    if (p.node.kind === 'decision') return renderDiamond(p)
+    if (p.node.kind === 'terminal') return renderTerminal(p)
+    return renderBox(p)
+  }
+
+  const decisionIdx = positioned.findIndex((p) => p.node.kind === 'decision' && !(resolvedChip && p.node.id === resolvedChip.nodeId))
 
   return (
-    <div className="flow-diagram-wrap">
-      <div className="flow-diagram-wrap__progress">
-        <span className="flow-diagram-wrap__progress-label" style={{ color: theme.subtext }}>サイクル進捗</span>
-        <div className="flow-diagram-wrap__progress-bar" style={{ background: theme.border }}>
-          <div
-            className="flow-diagram-wrap__progress-bar-fill"
-            style={{ width: `${cyclePct}%`, background: theme.accent }}
-          />
-        </div>
-        <span className="flow-diagram-wrap__progress-value" style={{ color: theme.accent }}>
-          {cycleCurrentLabel} / {cycleTotalLabel}
+    <div
+      className={`op-results__flow-scroll${scrollClassName ? ` ${scrollClassName}` : ''}`}
+      ref={scrollRef}
+      style={{ border: `1px solid ${theme.border}`, background: theme.surface }}
+    >
+      <div className="flow-diagram-wrap">
+        <svg className="flow-diagram" width={totalW} height={totalH} viewBox={`0 0 ${totalW} ${totalH}`}>
+          <defs>
+            <marker id={markerId} markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill={theme.subtext} />
+            </marker>
+          </defs>
+          {positioned.map((p) => renderNode(p))}
+          {positioned.slice(0, -1).map((p, i) => (
+            <line
+              key={`${p.node.id}-arrow`}
+              x1={p.right}
+              y1={rowCenterY}
+              x2={positioned[i + 1].left}
+              y2={rowCenterY}
+              stroke={theme.accent}
+              strokeWidth={2}
+              markerEnd={`url(#${markerId})`}
+            />
+          ))}
+          {decisionForwardLabel && decisionIdx >= 0 && decisionIdx + 1 < positioned.length && (
+            <text
+              x={(positioned[decisionIdx].right + positioned[decisionIdx + 1].left) / 2}
+              y={rowCenterY - 15} 
+              textAnchor="middle"
+              className="flow__branch-label"
+              fill={OK_COLOR}
+            >
+              {decisionForwardLabel}
+            </text>
+          )}
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+interface FlowPanelProps {
+  theme: Theme
+  title: string
+  progress: { current: number; total: number }
+  children: ReactNode
+}
+
+function FlowPanel({ theme, title, progress, children }: FlowPanelProps) {
+  return (
+    <div className="flow-diagram-panel">
+      <div className="flow-diagram-panel-head">
+        <span className="flow-diagram-panel-title" style={{ color: theme.text }}>
+          {title}
         </span>
-        <span className="flow-diagram-wrap__progress-value" style={{ color: theme.subtext }}>
-          ({cyclePct}%)
+        <span className="flow-diagram-progress" style={{ color: theme.subtext }}>
+          進捗 {progress.current || '--'}/{progress.total}工程
         </span>
       </div>
+      {children}
+    </div>
+  )
+}
 
-      <svg
-        className="flow-diagram"
-        viewBox={`${-leftExtra} 0 ${leftExtra + MARGIN_X * 2 + BOX_W + rightExtra} ${totalH}`}
-        preserveAspectRatio="xMidYMin meet"
-      >
-        <defs>
-          <marker id="flow-arrow" markerWidth="11" markerHeight="11" refX="8" refY="4" orient="auto">
-            <path d="M0,0 L8,4 L0,8 Z" fill={theme.subtext} />
-          </marker>
-        </defs>
+interface JobFlowDiagramProps {
+  theme: Theme
+  /** PLCのDレジスタ（現在工程ステップ）から受け取る値。該当工程を強調表示します。 */
+  activeStep?: number
+  /** PLCのNG判定信号（true = NG検出中）。全体フローの分岐確定に使用します。 */
+  ngSignal?: boolean
+}
 
-        <text x={cx} y={title1Y} dominantBaseline="middle" textAnchor="middle" className="flow__title" fill={theme.accent}>
-          ① 上刃自動セッティング
-        </text>
+/** 全体フロー図（自動スライド方式・枠で囲んだ表示）。RB1／RB2は RobotFlows を使用してください。 */
+export default function JobFlowDiagram({ theme, activeStep, ngSignal }: JobFlowDiagramProps) {
+  const { nodes, resolved, progress } = resolveOverallFlow(activeStep, ngSignal)
+  const resolvedChip = resolved ? { nodeId: 'ov-d', label: ngSignal ? 'NG' : 'OK', color: ngSignal ? NG_COLOR : OK_COLOR } : undefined
+  return (
+    <FlowPanel theme={theme} title="全体フロー" progress={progress}>
+      <FlowCanvas
+        theme={theme}
+        nodes={nodes}
+        sizing={OVERALL_SIZING}
+        markerId="flow-arrow-overall"
+        activeStep={activeStep}
+        resolvedChip={resolvedChip}
+        autoSlide
+        scrollClassName="op-results__flow-scroll--overall"
+      />
+    </FlowPanel>
+  )
+}
 
-        {settingNodes.map((n, i) => (
-          <g key={n.id}>
-            {renderBox(n)}
-            {i < settingNodes.length - 1 && arrowDown(n.y + BOX_H, settingNodes[i + 1].y, `${n.id}-arrow`)}
-          </g>
-        ))}
-
-        {/* セッティング先頭へ戻るループ矢印（LOOP_CONFIG.settingLoop で調整） */}
-        <path
-          d={bulgeLoopPath(
-            MARGIN_X - 1, settingBottom - BOX_H / 2,
-            MARGIN_X, settingNodes[0].y + BOX_H / 2,
-            LOOP_CONFIG.settingLoop, -1
-          )}
-          fill="none" stroke={theme.accent} strokeWidth={3.5} strokeDasharray="12 6" markerEnd="url(#flow-arrow)"
+/** RB1／RB2フロー。全体フローと同じ矩形・ひし形・端子の形状を用い、それぞれ枠で囲んで表示する。 */
+export function RobotFlows({ theme, activeStep }: { theme: Theme; activeStep?: number }) {
+  const rb1Progress = computeProgress(RB1_FLOW, activeStep)
+  const rb2Progress = computeProgress(RB2_FLOW, activeStep)
+  return (
+    <div className="flow-robot-panels">
+      <FlowPanel theme={theme} title="RB1フロー" progress={rb1Progress}>
+        <FlowCanvas
+          theme={theme}
+          nodes={RB1_FLOW}
+          sizing={ROBOT_SIZING}
+          markerId="flow-arrow-rb1"
+          activeStep={activeStep}
+          decisionForwardLabel="YES"
+          autoSlide
+          scrollClassName="op-results__flow-scroll--robot"
         />
-
-        {/* フェーズ間の連結線（矢印は最後だけ／区切りテキストとタイトルはこの上に重ねて表示） */}
-        {arrowDown(settingBottom, extractionNodes[0].y, 'phase-transition')}
-
-        <text x={cx} y={dividerY} dominantBaseline="middle" textAnchor="middle" className="flow__divider" fill={theme.subtext}>
-          全刃セット完了 → 交換へ
-        </text>
-
-        <text x={cx} y={title2Y} dominantBaseline="middle" textAnchor="middle" className="flow__title" fill={theme.accent}>
-          ② 上刃取出し・交換
-        </text>
-
-        {extractionNodes.map((n, i) => {
-          if (i === extractionNodes.length - 1) return renderBox(n)
-          const next = extractionNodes[i + 1]
-          if (n.kind === 'decision') {
-            return (
-              <g key={n.id}>
-                {renderBox(n)}
-                {arrowDown(n.y + BOX_H + DIAMOND_BOTTOM_INSET + DECISION_ARROW_CONFIG.outGap, next.y, `${n.id}-ng`)}
-                <text x={cx + 235} y={n.y + BOX_H - 20} dominantBaseline="hanging" className="flow__branch-label" fill={theme.subtext}>NG</text>
-                {/* OK分岐：格納ノードまで右側を迂回（LOOP_CONFIG.decisionBranch で調整） */}
-                <path
-                  d={bulgeLoopPath(
-                    cx + (BOX_W - 12) / 2, n.y + BOX_H / 2,
-                    cx + BOX_W / 2, lastNode.y + BOX_H / 2,
-                    LOOP_CONFIG.decisionBranch, 1
-                  )}
-                  fill="none" stroke={theme.accent} strokeWidth={2.5} markerEnd="url(#flow-arrow)"
-                />
-                <text x={MARGIN_X + BOX_W + 50} y={(n.y + lastNode.y) / 2 - 28} dominantBaseline="middle" className="flow__branch-label" fill={theme.accent}>OK</text>
-              </g>
-            )
-          }
-          const arrowEndY = next.kind === 'decision'
-            ? next.y - DIAMOND_TOP_INSET + DECISION_ARROW_CONFIG.intoGap
-            : next.y
-          return (
-            <g key={n.id}>
-              {renderBox(n)}
-              {arrowDown(n.y + BOX_H, arrowEndY, `${n.id}-arrow`)}
-            </g>
-          )
-        })}
-
-        {/* 取出しフェーズ先頭へ戻るループ矢印（LOOP_CONFIG.extractionLoop で調整） */}
-        <path
-          d={bulgeLoopPath(
-            MARGIN_X - 3, lastNode.y + BOX_H / 2,
-            MARGIN_X + 1, extractionNodes[0].y + BOX_H / 2,
-            LOOP_CONFIG.extractionLoop, -1
-          )}
-          fill="none" stroke={theme.accent} strokeWidth={3.5} strokeDasharray="12 6" markerEnd="url(#flow-arrow)"
+        <div className="flow-diagram-note" style={{ color: NG_COLOR }}>
+          NO時は再度「下刃撮像」へ
+        </div>
+      </FlowPanel>
+      <FlowPanel theme={theme} title="RB2フロー" progress={rb2Progress}>
+        <FlowCanvas
+          theme={theme}
+          nodes={RB2_FLOW}
+          sizing={ROBOT_SIZING}
+          markerId="flow-arrow-rb2"
+          activeStep={activeStep}
+          decisionForwardLabel="YES"
+          autoSlide
+          scrollClassName="op-results__flow-scroll--robot"
         />
-
-        {/* 全刃セット完了後、①へ戻る大きなループ */}
-        <path
-          d={`M ${MARGIN_X + BOX_W} ${lastNode.y + BOX_H / 2} L ${MARGIN_X + BOX_W + 50} ${lastNode.y + BOX_H / 2} L ${MARGIN_X + BOX_W + 50} ${settingNodes[0].y + BOX_H / 2} L ${MARGIN_X + BOX_W} ${settingNodes[0].y + BOX_H / 2}`}
-          fill="none" stroke={theme.accent} strokeWidth={2.5} markerEnd="url(#flow-arrow)"
-        />
-      </svg>
+        <div className="flow-diagram-note" style={{ color: NG_COLOR }}>
+          NO時は再度「ねじ締めを行う」へ
+        </div>
+      </FlowPanel>
     </div>
   )
 }

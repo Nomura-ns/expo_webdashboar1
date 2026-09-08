@@ -24,8 +24,16 @@
     0 6px 18px rgba(0, 0, 0, 0.28);
 
   width: 100%;
-  max-width: 1800px;
+  max-width: none;
   z-index: 2;
+}
+
+
+/* nameplate-quiz側：残り全部を埋める */
+.panel-frame.nameplate-quiz {
+  flex: 1 1 auto;   /* .panel-frameのデフォルトと同じなので実は省略可 */
+  height: auto;
+  min-height: 0;    /* 同上、省略可 */
 }
 
 .panel-frame__rivet {
@@ -45,7 +53,7 @@
   display: flex;
   align-items: baseline;
   gap: 12px;
-  padding-bottom: 12px;
+  padding-bottom: clamp(4px, 1vw, 12px);
   margin-bottom: 14px;
   border-bottom: 1px solid var(--brass-dim);
   position: relative;

@@ -613,30 +613,43 @@ export default function Sidebar({
       {/* ブックマークタブ */}
       <div style={{
         position: 'fixed',
-        top: '10%',
-        left: sidebarOpen ? '10.2%' : '-1.2%',
+        top: '9.2%',
+        left: sidebarOpen ? '9.9%' : '-1.6%',
         display: 'flex', flexDirection: 'column',
         alignItems: 'flex-start',
         paddingTop: '20px',
         zIndex: 50,
         transition: 'left 0.2s ease',
       }}>
-        <div
+       <div
   onClick={onToggle}
   onMouseEnter={handleSidebarMouseEnter}
   style={{
-    width: '100%', height: '100%',
     background: sidebarOpen ? theme.accent : theme.surface,
     color: sidebarOpen ? '#fff' : theme.subtext,
     border: `1px solid ${sidebarOpen ? theme.accent : theme.border}`,
     borderRadius: '6px 6px 0 0',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    gap: '4px',
-    fontSize: '23px', fontWeight: 'bold',
+
+    /* ← 余白を追加 */
+    padding: '8px 14px',
+
+    /* ← 高さを固定して見た目を安定させる */
+    height: '32px',
+
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+
+    fontSize: '14px',
+    fontWeight: 'bold',
     cursor: 'pointer',
     transition: 'all 0.2s',
-    transform: 'rotate(90deg) translateX(48px) translateY(70px)',
+
+    /* ← rotate 後の位置調整を少しマイルドに */
+    transform: 'rotate(90deg) translateX(40px) translateY(60px)',
     transformOrigin: 'right center',
+
     whiteSpace: 'nowrap',
   }}
 >
@@ -646,6 +659,7 @@ export default function Sidebar({
   />
   画面切替
 </div>
+
       </div>
 
       {/* スライドパネル */}

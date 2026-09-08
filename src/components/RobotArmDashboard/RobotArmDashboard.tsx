@@ -442,7 +442,7 @@ export default function RobotArmDashboard({ theme,  themeMode = 'dark',isEditing
                 </>
               )}
 
-              <img src={qrUrl} alt="QRコード" className="op-status__qr" />
+              <img src={qrUrl} alt="QRコード" className="robot-dashboard__qr" />
             </div>
           </div>
         )}

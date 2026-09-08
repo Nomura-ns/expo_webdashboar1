@@ -3,6 +3,14 @@
 // 「軸別 速度（MAX比）」パネル。軸(1〜6)ごとにRB1/RB2の半円ゲージを並べる。
 // トルク使用率とは別指標（PLC対象外・サンプル値のまま運用中）のため、
 // しきい値判定もこのコンポーネント内で速度%に対して独立に行う。
+//
+// 注: OperationStatus.tsxからは現在このグリッド表示ではなく、軸ごとにトルクと
+// まとめて表示するAxisMetricRow経由でSemiGaugeを使う構成に変更したため、
+// このコンポーネント自体は現状どこからも呼ばれていない。将来グリッド表示に
+// 戻す場合のために残してある。
+
+import SemiGauge from './SemiGauge'
+import { RB1_COLOR, RB2_COLOR } from './robotColors'
 
 export interface AxisSpeedRow {
   axis: number
@@ -13,30 +21,6 @@ export interface AxisSpeedRow {
 interface Props {
   data: AxisSpeedRow[]
   threshold: number
-}
-
-const RB1_COLOR = '#3b82f6'
-const RB2_COLOR = '#ff9a3d'
-const TRACK_COLOR = 'var(--border-soft, #2a3650)'
-
-function SemiGauge({ value, color, label }: { value: number; color: string; label: string }) {
-  const clamped = Math.min(100, Math.max(0, value))
-  return (
-    <div className="semi-gauge">
-      <svg className="semi-gauge__svg" viewBox="0 0 100 58">
-        <path d="M 8 50 A 42 42 0 0 1 92 50" className="semi-gauge__track" pathLength={100} />
-        <path
-          d="M 8 50 A 42 42 0 0 1 92 50"
-          className="semi-gauge__value"
-          pathLength={100}
-          style={{ stroke: color, strokeDasharray: `${clamped} ${100 - clamped}` }}
-        />
-      </svg>
-      <div className="semi-gauge__label" style={{ color }}>
-        {label} {clamped}%
-      </div>
-    </div>
-  )
 }
 
 export default function SpeedGaugeGrid({ data, threshold }: Props) {

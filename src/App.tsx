@@ -264,6 +264,12 @@ export default function App() {
       window.removeEventListener('resize', update)
     }
   }, [])
+  useEffect(() => {
+  document.documentElement.style.setProperty(
+    '--panel-offset-x',
+    sidebarOpen ? '220px' : '0px'
+  )
+  }, [sidebarOpen])
 
   return (
     <div
@@ -446,6 +452,7 @@ export default function App() {
         </div>
       </div>
       <footer
+        className="app-footer"
         style={{
           position: 'fixed',      
           bottom: 0,               
@@ -461,6 +468,7 @@ export default function App() {
          }}
         >
       <span
+        
         style={{
           color: theme.text,
           fontSize: '20px',

@@ -1,267 +1,185 @@
-.op-status__layout {
+.axis-monitor {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   align-items: stretch;
   flex: 1;
   min-height: 0;
   height: 100%;
-  /* スクロールは使わず、下の各要素にflex比率を持たせて確実にパネル内へ収める */
+  position: relative; /* QRコードを右下に絶対配置するための基準 */
   overflow: hidden;
 }
 
-/* アーム構成(左) / 軸別トルク使用率(中央・主役) / ROBOT稼働率(右) を横並びに */
-.op-status__main-row {
+/* 軸ラベル列の幅・速度リング列の幅を、ヘッダー行・データ行の両方で揃えるための共通グリッド */
+.axis-monitor__header-row,
+.axis-row {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr) 210px;
-  gap: 16px;
-  align-items: stretch;
-  flex: 7;
-  min-height: 0;
+  grid-template-columns: 100px minmax(0, 1fr) 150px minmax(0, 1fr) 100px;
+  align-items: center;
+  column-gap: 14px;
 }
 
-.op-status__card {
-  background: var(--bg-panel);
-  border: 1px solid var(--border-soft);
-  border-radius: 12px;
-  padding: 16px;
-  min-width: 0;
-  min-height: 0;
-}
+/* ===== 上部タイトルバー ===== */
 
-.op-status__card--arm,
-.op-status__card--util {
+.axis-monitor__topbar {
   display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.op-status__card--torque {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.op-status__card--torque .torque-chart {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.op-status__card--torque .torque-pyramid {
-  flex: 1;
-  min-height: 0;
-}
-
-.op-status__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-}
-
-/* ===== アーム構成 ===== */
-
-.arm-diagram {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
-}
-
-.arm-diagram__svg {
-  width: 100%;
-  flex: 1;
-  min-height: 150px;
-}
-
-.arm-diagram__link {
-  fill: none;
-  stroke: var(--border-soft);
-  stroke-width: 3.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0.9;
-}
-
-.arm-diagram__axis-label {
-  font-size: 3.2px;
-  fill: var(--text-secondary, #9aa4b2);
-}
-
-.arm-diagram__legend {
-  display: flex;
+  align-items: baseline;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 18px;
+  flex: 0 0 auto;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
-.arm-diagram__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary, #9aa4b2);
-}
-
-.arm-diagram__legend-item i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-/* ===== ROBOT稼働率（ドーナツ） ===== */
-
-.op-status__util-row {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
-}
-
-.utilization-donut {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-.utilization-donut__label {
+.axis-monitor__title {
   font-size: 20px;
-  color: var(--text-secondary, #9aa4b2);
-}
-
-.utilization-donut__ring {
-  position: relative;
-  width: 150px;
-  height: 150px;
-}
-
-.utilization-donut__ring svg {
-  width: 100%;
-  height: 100%;
-}
-
-.utilization-donut__track,
-.utilization-donut__value {
-  fill: none;
-  stroke-width: 10;
-  stroke-linecap: round;
-}
-
-.utilization-donut__value {
-  transition: stroke-dasharray 0.3s ease;
-}
-
-.utilization-donut__center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.utilization-donut__number {
-  font-size: 35px;
   font-weight: 800;
-  line-height: 1;
-  color: var(--text-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.utilization-donut__percent {
-  font-size: 20px;
-  color: var(--text-secondary, #9aa4b2);
-}
-
-.utilization-donut__caption {
-  font-size: 20px;
-  color: var(--text-secondary, #9aa4b2);
-  margin-top: 2px;
-}
-
-.utilization-donut__legend {
-  display: flex;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--text-secondary, #9aa4b2);
-}
-
-.utilization-donut__legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.utilization-donut__legend i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-/* ===== 軸別トルク使用率 ===== */
-
-.torque-chart {
-  position: relative;
-}
-
-.torque-chart__header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.torque-chart__title {
-  font-size: 15px;
-  font-weight: 600;
   color: var(--text-primary);
 }
 
-.torque-chart__legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  flex: 1;
-}
-
-.torque-chart__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.axis-monitor__unit {
   font-size: 12px;
   color: var(--text-secondary, #9aa4b2);
 }
 
-.torque-chart__legend-item i {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  display: inline-block;
+.axis-monitor__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-left: auto;
 }
 
-.torque-chart__legend-item--tick i {
-  width: 0;
-  height: 12px;
-  border-left: 2px dashed;
-  border-radius: 0;
-}
-
-.torque-chart__unit {
-  font-size: 11px;
+.axis-monitor__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   color: var(--text-secondary, #9aa4b2);
   white-space: nowrap;
 }
 
-.torque-chart__warn-badge {
+.axis-monitor__legend-item--peak i {
+  width: 0;
+  height: 12px;
+  border-left: 2px solid var(--text-secondary, #9aa4b2);
+}
+
+.axis-monitor__legend-item--threshold i {
+  width: 0;
+  height: 12px;
+  border-left: 2px dashed;
+}
+
+.axis-monitor__clock {
+  font-size: 13px;
+  color: var(--text-secondary, #9aa4b2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ===== RB1/RB2バッジ＋中央見出し ===== */
+
+.axis-monitor__header-row {
+  flex: 0 0 auto;
+}
+
+.robot-header-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.robot-header-badge--right {
+  justify-content: flex-end;
+}
+
+.robot-header-badge__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.robot-header-badge--right .robot-header-badge__text {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.robot-header-badge__title {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.robot-header-badge__caption {
+  font-size: 12px;
+  color: var(--text-secondary, #9aa4b2);
+}
+
+.axis-monitor__header-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.axis-monitor__header-center-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.axis-monitor__header-center-caption {
+  font-size: 12px;
+  color: var(--text-secondary, #9aa4b2);
+}
+
+/* 稼働率ドーナツ：ヘッダーバッジ内に収まるようコンパクト化 */
+.utilization-donut--compact .utilization-donut__ring {
+  width: 64px;
+  height: 64px;
+}
+
+.utilization-donut--compact .utilization-donut__number {
+  font-size: 18px;
+}
+
+.utilization-donut--compact .utilization-donut__percent {
+  font-size: 11px;
+}
+
+.utilization-donut--compact .utilization-donut__value,
+.utilization-donut--compact .utilization-donut__track {
+  stroke-width: 12;
+}
+
+/* ===== 軸1〜6の行 ===== */
+
+.axis-monitor__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+}
+
+.axis-row {
+  flex: 1;
+  min-height: 0;
+}
+
+.axis-row__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.axis-row__warn-slots {
+  display: flex;
+  gap: 6px;
+  min-height: 15px;
+}
+
+.axis-row__warn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -272,50 +190,25 @@
   color: #ff4d4f;
   font-size: 10px;
   font-weight: 800;
-  margin-left: 4px;
 }
 
-/* ===== 軸別トルク使用率：人口ピラミッド型レイアウト ===== */
-/* 中心の軸ラベル列を挟んで、左=RB1（右詰め・左に伸びる）／右=RB2（左詰め・右に伸びる）を鏡合わせに描く */
-
-.torque-pyramid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-height: 0;
-}
-
-.torque-pyramid__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr);
-  align-items: stretch;
-  column-gap: 10px;
-  flex: 1;
-  min-height: 0;
-}
-
-.torque-pyramid__center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  font-size: 13px;
-  font-weight: 600;
+.axis-row__label {
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
 }
 
-/* 片側（RB1 or RB2）1本分：上部にピーク線+ラベル用の余白(padding-top)を確保し、
-   バー(track)は残り高さいっぱいに伸縮させる（固定pxではなく利用可能な行の高さに追従） */
-.torque-pyramid__side {
+/* ===== トルクバー（ピラミッド型・片側分） ===== */
+
+.torque-bar {
   position: relative;
   height: 100%;
   min-height: 0;
   padding-top: 20px;
 }
 
-.torque-pyramid__track {
+.torque-bar__track {
   position: absolute;
   left: 0;
   right: 0;
@@ -327,25 +220,24 @@
   display: flex;
 }
 
-.torque-pyramid__fill {
+.torque-bar__fill {
   position: absolute;
   top: 0;
   bottom: 0;
   display: flex;
   align-items: center;
   transition: width 0.3s ease;
-  border-radius: 3px;
 }
 
-.torque-pyramid__side--left .torque-pyramid__fill {
+.torque-bar--left .torque-bar__fill {
   border-radius: 6px 3px 3px 6px;
 }
 
-.torque-pyramid__side--right .torque-pyramid__fill {
+.torque-bar--right .torque-bar__fill {
   border-radius: 3px 6px 6px 3px;
 }
 
-.torque-pyramid__value {
+.torque-bar__value {
   padding: 0 8px;
   font-size: 12px;
   font-weight: 700;
@@ -353,8 +245,8 @@
   white-space: nowrap;
 }
 
-/* しきい値の目安線（各行・各サイドに常時薄く表示。中心からの距離はピークと同じ座標系） */
-.torque-pyramid__threshold-tick {
+/* しきい値の目安線（常時薄く表示。中心からの距離はピークと同じ座標系） */
+.torque-bar__threshold-tick {
   position: absolute;
   top: 0;
   bottom: 0;
@@ -363,8 +255,8 @@
   pointer-events: none;
 }
 
-/* ピークの目盛り線：ラベルとの間に隙間を作るため、行上端から少し離れた位置(top:14px)から始める */
-.torque-pyramid__peak-tick {
+/* ピークの目盛り線：ラベルとの間に隙間を作るため、padding-top内から始まる */
+.torque-bar__peak-tick {
   position: absolute;
   top: 14px;
   bottom: 0;
@@ -372,8 +264,8 @@
   border-left: 1.5px solid;
 }
 
-/* ピークのラベル：目盛り線よりさらに上（行の最上部）に置き、線と重ならないようにする */
-.torque-pyramid__peak-label {
+/* ピークのラベル：目盛り線よりさらに上に置き、線と重ならないようにする */
+.torque-bar__peak-label {
   position: absolute;
   top: 0;
   font-size: 10px;
@@ -381,161 +273,94 @@
   white-space: nowrap;
 }
 
-.torque-pyramid__side--left .torque-pyramid__peak-label {
+.torque-bar--left .torque-bar__peak-label {
   transform: translateX(50%);
 }
 
-.torque-pyramid__side--right .torque-pyramid__peak-label {
+.torque-bar--right .torque-bar__peak-label {
   transform: translateX(-50%);
 }
 
-/* 下部の目盛り軸（データ行のようにflex:1で伸ばさず、必要な高さだけ使う） */
-.torque-pyramid__row--axis {
-  flex: 0 0 auto;
-  margin-top: 2px;
-}
+/* ===== 速度リング（左右外側） ===== */
 
-.torque-pyramid__axis-ticks {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  color: var(--text-secondary, #9aa4b2);
-}
-
-/* ===== 軸別 速度（MAX比） ===== */
-
-.speed-gauge-grid {
+.speed-ring {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  flex: 1;
-  min-height: 0;
+  align-items: center;
+  gap: 4px;
 }
 
-.speed-gauge-grid__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  flex: 0 0 auto;
-}
-
-.speed-gauge-grid__title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.speed-gauge-grid__note {
+.speed-ring__label {
   font-size: 11px;
   color: var(--text-secondary, #9aa4b2);
 }
 
-.speed-gauge-grid__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
+.speed-ring__circle {
+  position: relative;
+  width: 76px;
+  height: 76px;
 }
 
-.speed-gauge-card {
-  background: var(--bg-inset, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-soft);
-  border-radius: 10px;
-  padding: 8px 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 0;
-  width:110%;
-  
-}
-
-.speed-gauge-card__title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.speed-gauge-card__warn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgba(255, 77, 79, 0.16);
-  color: #ff4d4f;
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.speed-gauge-card__gauges {
-  display: flex;
-  gap: 10px;
-}
-
-.semi-gauge {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 90px;
-}
-
-.semi-gauge__svg {
+.speed-ring__circle svg {
   width: 100%;
-  height: 50px;
+  height: 100%;
 }
 
-.semi-gauge__track,
-.semi-gauge__value {
+.speed-ring__track,
+.speed-ring__value {
   fill: none;
-  stroke-width: 9;
+  stroke-width: 10;
   stroke-linecap: round;
 }
 
-.semi-gauge__track {
-  stroke: var(--border-soft, #2a3650);
-}
-
-.semi-gauge__value {
+.speed-ring__value {
   transition: stroke-dasharray 0.3s ease;
 }
 
-.semi-gauge__label {
-  font-size: 12px;
-  font-weight: 700;
-  margin-top: 2px;
-}
-
-/* ===== QRコード（速度パネル右下） ===== */
-
-.op-status__card--speed {
-  position: relative;
-  flex: 3;
-  min-height: 0;
+.speed-ring__number {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
-.op-status__qr {
- position: absolute;
+/* ===== 下部フッター ===== */
+
+.axis-monitor__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex: 0 0 auto;
+  padding-top: 4px;
+  padding-right: 84px; /* 右下のQRコードと重ならないよう余白を確保 */
+  border-top: 1px solid var(--border-soft);
+  font-size: 11px;
+  color: var(--text-secondary, #9aa4b2);
+}
+
+.axis-monitor__footer span:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ===== QRコード（右下） ===== */
+
+.axis-monitor__qr {
+  position: absolute;
   right: 4px;
   bottom: 4px;
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
 }
 
 /* ===== 編集モード（新レイアウト向けの位置編集は準備中） ===== */
 
-.op-status__edit-note {
+.axis-monitor__edit-note {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -547,7 +372,7 @@
   color: var(--text-secondary, #9aa4b2);
 }
 
-.op-status__edit-note button {
+.axis-monitor__edit-note button {
   padding: 4px 10px;
   font-size: 12px;
   border: 1px solid var(--border-soft);
@@ -561,25 +386,26 @@
 /* ===== 狭幅対応 ===== */
 
 @media (max-width: 900px) {
-  .op-status__main-row {
-    grid-template-columns: 1fr;
+  .axis-monitor__header-row,
+  .axis-row {
+    grid-template-columns: 74px minmax(0, 1fr) 100px minmax(0, 1fr) 74px;
+    column-gap: 8px;
   }
 
-  .op-status__card--arm,
-  .op-status__card--util {
-    min-height: 180px;
+  .speed-ring__circle {
+    width: 56px;
+    height: 56px;
   }
 
-  .op-status__util-row {
-    flex-direction: row;
+  .speed-ring__number {
+    font-size: 15px;
   }
 
-  .torque-chart__axis-block {
-    grid-template-columns: 1fr;
+  .axis-monitor__topbar {
+    gap: 8px;
   }
 
-  .op-status__qr {
-    position: static;
-    margin-top: 12px;
+  .axis-monitor__legend {
+    margin-left: 0;
   }
 }

@@ -70,18 +70,19 @@ html, body {
 /* --- ダッシュボード共通レイアウト --- */
 :root {
   /* パネル全体を右にずらす量。ここだけ触れば全ページに反映される */
-  --panel-offset-x: 30px;
+  --panel-offset-x: 0px;
 }
 /* 高さは flex:1 でヘッダーの実高さ(--header-h)に追従させる方式を正とする */
 .dashboard-page {
   padding: 35px 35px calc(35px + 20px);
   box-sizing: border-box;
-  width: 100%;
+  width: calc(100% - var(--panel-offset-x));
+  margin-left: var(--panel-offset-x);
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  transform: translateX(var(--panel-offset-x));
+  transition: width 0.3s ease, margin-left 0.3s ease; /* サイドバーの0.3sと合わせる */
 }
 
 
@@ -122,5 +123,14 @@ html, body {
     flex: 1;
   }
 
- 
+  .dashboard-page {
+    width: 100%;
+    margin-left: 0;
+    /* 下部固定ナビ(64px)の分だけ余白を追加 */
+    padding-bottom: calc(24px + 64px + env(safe-area-inset-bottom));
+  }
+
+  .app-footer {
+    display: none !important;
+  }
 }

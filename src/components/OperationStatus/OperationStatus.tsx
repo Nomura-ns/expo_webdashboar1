@@ -2,10 +2,10 @@
 import PanelFrame from '../common/PanelFrame'
 import type { Theme } from '../../types'
 
-import ArmDiagram, { type ArmJointPosition } from './ArmDiagram'
-import UtilizationRateDisplay from './UtilizationRateDisplay'
-import TorqueUsageChart, { type AxisTorqueRow } from './TorqueUsageChart'
-import SpeedGaugeGrid, { type AxisSpeedRow } from './SpeedGaugeGrid'
+import RobotHeaderBadge from './RobotHeaderBadge'
+import AxisRow, { type AxisRowData } from './AxisRow'
+import LiveClock from './LiveClock'
+import { RB1_COLOR, RB2_COLOR, WARN_COLOR } from './robotColors'
 
 import './OperationStatus.css'
 
@@ -28,8 +28,6 @@ interface OperationStatusProps {
   theme: Theme
   /** ライト/ダークの判定（QRコード画像の出し分けに使用） */
   themeMode?: 'light' | 'dark'
-  /** RB1・RB2は同一機種のため、アーム図・画像は1台分のみ表示するが、
-   *  しきい値の状態はRB1・RB2の2台分をそれぞれ表示する */
   imageUrl?: string
   robotRB1: RobotStat
   robotRB2: RobotStat
@@ -41,16 +39,6 @@ interface OperationStatusProps {
 
 // しきい値（トルク・速度どちらも同じ%で判定）
 const THRESHOLD = 80
-
-// アーム図：軸(1〜6)の位置（%）。RB1/RB2で共通のシンプルなschematic用の座標。
-const JOINT_POSITIONS: ArmJointPosition[] = [
-  { axis: 1, x: 58, y: 82 },
-  { axis: 2, x: 68, y: 49 },
-  { axis: 3, x: 71, y: 35 },
-  { axis: 4, x: 62, y: 26 },
-  { axis: 5, x: 44, y: 19 },
-  { axis: 6, x: 26, y: 21 },
-]
 
 // QRコード画像。ダーク/ライトのテーマに応じて出し分ける（配置予定：/public 直下）
 const QR_CODE_URL = {
@@ -68,63 +56,86 @@ export default function OperationStatus({
 }: OperationStatusProps) {
   const axisCount = Math.max(robotRB1.motors.length, robotRB2.motors.length, 6)
 
-  const torqueRows: AxisTorqueRow[] = Array.from({ length: axisCount }, (_, i) => ({
+  const axisRows: AxisRowData[] = Array.from({ length: axisCount }, (_, i) => ({
     axis: i + 1,
     rb1: {
-      value: robotRB1.motors[i]?.torque ?? 0,
-      peak: robotRB1.motors[i]?.peakTorque ?? 0,
+      torqueValue: robotRB1.motors[i]?.torque ?? 0,
+      torquePeak: robotRB1.motors[i]?.peakTorque ?? 0,
+      speed: robotRB1.motors[i]?.speed ?? 0,
     },
     rb2: {
-      value: robotRB2.motors[i]?.torque ?? 0,
-      peak: robotRB2.motors[i]?.peakTorque ?? 0,
+      torqueValue: robotRB2.motors[i]?.torque ?? 0,
+      torquePeak: robotRB2.motors[i]?.peakTorque ?? 0,
+      speed: robotRB2.motors[i]?.speed ?? 0,
     },
-  }))
-
-  const speedRows: AxisSpeedRow[] = Array.from({ length: axisCount }, (_, i) => ({
-    axis: i + 1,
-    rb1: robotRB1.motors[i]?.speed ?? 0,
-    rb2: robotRB2.motors[i]?.speed ?? 0,
-  }))
-
-  // アーム図に出す軸ごとのしきい値超過フラグ（RB1・RB2それぞれ独立に判定）
-  const warnByAxis = torqueRows.map((row) => ({
-    rb1: row.rb1.peak >= THRESHOLD,
-    rb2: row.rb2.peak >= THRESHOLD,
   }))
 
   const qrUrl = themeMode === 'light' ? QR_CODE_URL.light : QR_CODE_URL.dark
 
   return (
     <PanelFrame className={`op-status op-status--${theme}`}>
-      <div className="op-status__layout">
-        <div className="op-status__main-row">
-          <div className="op-status__card op-status__card--arm">
-            <div className="op-status__title">アーム構成</div>
-            <ArmDiagram jointPositions={JOINT_POSITIONS} warnByAxis={warnByAxis} />
+      <div className="axis-monitor">
+        {/* 上部タイトルバー：タイトル・単位/凡例・現在時刻 */}
+        <div className="axis-monitor__topbar">
+          <div className="axis-monitor__title">軸モニタ ー RB1 / RB2 比較</div>
+          <div className="axis-monitor__unit">
+            トルク：定格トルク比 % ／ 速度：MAX比 %
           </div>
-
-          <div className="op-status__card op-status__card--torque">
-            <TorqueUsageChart data={torqueRows} threshold={THRESHOLD} />
+          <div className="axis-monitor__legend">
+            <span className="axis-monitor__legend-item axis-monitor__legend-item--peak">
+              <i />
+              ピーク値
+            </span>
+            <span className="axis-monitor__legend-item axis-monitor__legend-item--threshold">
+              <i style={{ borderColor: WARN_COLOR }} />
+              しきい値近接（{THRESHOLD}%〜）
+            </span>
           </div>
-
-          <div className="op-status__card op-status__card--util">
-            <div className="op-status__title">ROBOT 稼働率</div>
-            <div className="op-status__util-row">
-              <UtilizationRateDisplay label="RB1" rate={robotRB1.utilizationRate} colorKey="RB1" />
-              <UtilizationRateDisplay label="RB2" rate={robotRB2.utilizationRate} colorKey="RB2" />
-            </div>
-          </div>
+          <LiveClock />
         </div>
 
-        <div className="op-status__card op-status__card--speed">
-          <SpeedGaugeGrid data={speedRows} threshold={THRESHOLD} />
-          <img src={qrUrl} alt="QRコード" className="op-status__qr" />
+        {/* RB1/RB2の稼働率バッジ＋中央見出し */}
+        <div className="axis-monitor__header-row">
+          <RobotHeaderBadge
+            label="RB1"
+            colorKey="RB1"
+            color={RB1_COLOR}
+            utilizationRate={robotRB1.utilizationRate}
+            align="left"
+          />
+          <div className="axis-monitor__header-center">
+            <div className="axis-monitor__header-center-title">軸別</div>
+            <div className="axis-monitor__header-center-caption">トルク・速度</div>
+          </div>
+          <RobotHeaderBadge
+            label="RB2"
+            colorKey="RB2"
+            color={RB2_COLOR}
+            utilizationRate={robotRB2.utilizationRate}
+            align="right"
+          />
         </div>
 
-        {/* 編集モード：新レイアウト（バー/ドーナツ/ゲージ表示）向けの位置編集UIは未実装。
+        {/* 軸1〜6：中央ラベルを挟んでRB1/RB2のトルク・速度を左右対称に表示 */}
+        <div className="axis-monitor__rows">
+          {axisRows.map((row) => (
+            <AxisRow key={row.axis} data={row} threshold={THRESHOLD} />
+          ))}
+        </div>
+
+        {/* 下部の補足＋QRコード */}
+        <div className="axis-monitor__footer">
+          <span>棒グラフ：現在トルク%（内側＝軸ラベル側が現在値）</span>
+          <span>異常しきい値{THRESHOLD}%を超えると赤破線に接近</span>
+          <span>データ更新：現場PLC同期</span>
+        </div>
+
+        <img src={qrUrl} alt="QRコード" className="axis-monitor__qr" />
+
+        {/* 編集モード：新レイアウト向けの位置編集は未実装。
             トグル自体はSettingsPanelと同期を取るため残してあります。 */}
         {isEditing && (
-          <div className="op-status__edit-note">
+          <div className="axis-monitor__edit-note">
             編集モード：このページの表示位置編集は現在準備中です。
             <button type="button" onClick={() => onEditingChange(false)}>
               編集モードを終了

@@ -101,6 +101,20 @@
   font-family: var(--font-mono);
 }
 
+/* ===== モニタ（52インチ等の大画面）向け：見出し文字を拡大 =====
+   768px超（モバイル以外）が対象。モバイルは従来サイズのまま維持する */
+@media (min-width: 769px) {
+  .panel-frame__index {
+    font-size: 22px;
+  }
+  .panel-frame__title {
+    font-size: 27px;
+  }
+  .panel-frame__subtitle {
+    font-size: 17px;
+  }
+}
+
 .panel-frame__body {
   flex: 1;
   min-height: 0;

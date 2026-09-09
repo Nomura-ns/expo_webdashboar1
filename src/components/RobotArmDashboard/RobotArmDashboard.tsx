@@ -149,6 +149,9 @@ export default function RobotArmDashboard({ theme,  themeMode = 'dark',isEditing
 
   const clampedActiveIndex = Math.min(activeCameraIndex, Math.max(0, clientCount - 1))
 
+  // --- モバイル：ステータスボックスに表示する「現在タブのカメラ」 ---
+  const activeCamera = cameras[clampedActiveIndex] ?? cameras[0]
+
   // --- モバイル：タブクリック → 該当ページへスクロール ---
   const scrollToCameraIndex = (index: number) => {
     const el = mobileScrollerRef.current
@@ -335,6 +338,43 @@ export default function RobotArmDashboard({ theme,  themeMode = 'dark',isEditing
                     )}
                   </button>
                 ))}
+              </div>
+            )}
+
+            {activeCamera && (
+              <div
+                className="robot-dashboard__mobile-status"
+                style={{ background: theme.headerBg, borderColor: theme.border }}
+              >
+                <span
+                  className="robot-dashboard__mobile-status-run"
+                  style={{
+                    borderColor: theme.border,
+                    color: isRunning ? theme.accent : theme.subtext,
+                  }}
+                >
+                  <span className="robot-dashboard__status-dot" />
+                  {isRunning ? '運転中' : '停止中'}
+                </span>
+
+                <div className="robot-dashboard__mobile-status-info">
+                  <span className="robot-dashboard__mobile-status-info-item">
+                    <span className="robot-dashboard__mobile-status-info-label">撮影箇所</span>
+                    <span>{activeCamera.location || '-'}</span>
+                  </span>
+                  <span className="robot-dashboard__mobile-status-info-item">
+                    <span className="robot-dashboard__mobile-status-info-label">状態</span>
+                    <span className={activeCamera.status === '異常' ? 'is-abnormal' : 'is-normal'}>
+                      {activeCamera.status}
+                    </span>
+                  </span>
+                  <span className="robot-dashboard__mobile-status-info-item">
+                    <span className="robot-dashboard__mobile-status-info-label">完了工程</span>
+                    <span>
+                      {activeCamera.completedSteps ?? 0} / {activeCamera.totalSteps ?? 0}
+                    </span>
+                  </span>
+                </div>
               </div>
             )}
 

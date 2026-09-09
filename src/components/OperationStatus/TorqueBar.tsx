@@ -3,6 +3,13 @@
 // 軸モニタ中央のピラミッド表示用、片側（RB1 or RB2）のトルクバー1本分。
 // side='left' はRB1（軸ラベル側=右に寄せて描画。値が増えるほど左へ伸びる）
 // side='right' はRB2（軸ラベル側=左に寄せて描画。値が増えるほど右へ伸びる）
+//
+// 変更点：
+// ・ピークが正常範囲内のときの目盛り線・ラベル色は、これまで未定義のCSS変数
+//   var(--text-secondary) 頼みで薄く見えることがあったため、mutedColorとして
+//   theme.subtextを外から渡せるようにした（省略時は従来のフォールバック色）
+// ・バー内の数値ラベルは、編集パネルでRB1/RB2色を任意色に変更しても白文字の
+//   視認性が落ちないよう、OperationStatus.css側にtext-shadowを追加してある
 
 import type { CSSProperties } from 'react'
 import { WARN_COLOR } from './robotColors'
@@ -13,17 +20,19 @@ interface Props {
   peak: number
   color: string
   threshold: number
+  /** ピークが正常範囲内の場合の目盛り線・ラベル色。省略時は既定のグレー */
+  mutedColor?: string
 }
 
-const NORMAL_PEAK_COLOR = 'var(--text-secondary, #8a97ac)'
+const DEFAULT_MUTED_COLOR = 'var(--text-secondary, #8a97ac)'
 
 function pct(v: number) {
   return Math.min(100, Math.max(0, v))
 }
 
-export default function TorqueBar({ side, value, peak, color, threshold }: Props) {
+export default function TorqueBar({ side, value, peak, color, threshold, mutedColor }: Props) {
   const isWarn = peak >= threshold
-  const peakColor = isWarn ? WARN_COLOR : NORMAL_PEAK_COLOR
+  const peakColor = isWarn ? WARN_COLOR : mutedColor ?? DEFAULT_MUTED_COLOR
   const anchorProp = side === 'left' ? 'right' : 'left'
 
   const fillStyle: CSSProperties = {

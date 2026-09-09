@@ -543,6 +543,62 @@ position: absolute;
   box-shadow: 0 0 6px rgba(255, 70, 70, 0.6);
 }
 
+/* --- モバイル：タブとカメラ画像の間のステータスボックス（運転中/停止中 + 現在タブのカメラ情報） --- */
+.robot-dashboard__mobile-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  flex-shrink: 0;
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+}
+
+.robot-dashboard__mobile-status-run {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+
+.robot-dashboard__mobile-status-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 0.75rem;
+}
+
+.robot-dashboard__mobile-status-info-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.robot-dashboard__mobile-status-info-label {
+  opacity: 0.65;
+}
+
+.robot-dashboard__mobile-status-info-item .is-normal {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.robot-dashboard__mobile-status-info-item .is-abnormal {
+  color: #ff6b6b;
+  font-weight: 600;
+}
+
 /* 横スクロールで1台ずつ切替（スナップ）。表示は常に1台のみ */
 .robot-dashboard__mobile-scroller {
   flex: 1 1 auto;
@@ -603,4 +659,31 @@ position: absolute;
 /* 画像がない場合（NO SIGNAL）のみ、従来通り4:3の枠を確保 */
 .robot-dashboard__mobile-frame .robot-dashboard__camera-placeholder {
   aspect-ratio: 4 / 3;
+}
+
+/* --- モバイル：カメラ画像内オーバーレイの文字サイズを少し小さくする --- */
+.robot-dashboard__mobile-frame .robot-dashboard__camera-placeholder {
+  font-size: 1.6rem;
+}
+
+.robot-dashboard__mobile-frame .robot-dashboard__camera-label {
+  font-size: 1rem;
+}
+
+.robot-dashboard__mobile-frame .robot-dashboard__camera-location {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+}
+
+.robot-dashboard__mobile-frame .robot-dashboard__status-badge {
+  font-size: 0.85rem;
+  padding: 2px 7px;
+}
+
+.robot-dashboard__mobile-frame .robot-dashboard__camera-clock {
+  font-size: 0.7rem;
+}
+
+.robot-dashboard__mobile-frame .robot-dashboard__camera-rec {
+  font-size: 0.65rem;
 }

@@ -1,9 +1,11 @@
 // OperationStatus.tsx
+import { useState } from 'react'
 import PanelFrame from '../common/PanelFrame'
 import type { Theme } from '../../types'
 
 import RobotHeaderBadge from './RobotHeaderBadge'
 import AxisRow, { type AxisRowData } from './AxisRow'
+import AxisTable from './AxisTable'
 import LiveClock from './LiveClock'
 import { RB1_COLOR, RB2_COLOR, WARN_COLOR } from './robotColors'
 
@@ -56,8 +58,27 @@ export default function OperationStatus({
 }: OperationStatusProps) {
   const axisCount = Math.max(robotRB1.motors.length, robotRB2.motors.length, 6)
 
+  // RB1/RB2カラーの編集（参考：OperationResults.tsxの色編集パターン）
+  const [customColors, setCustomColors] = useState<{ rb1?: string; rb2?: string }>({})
+  const rb1Color = customColors.rb1 ?? RB1_COLOR
+  const rb2Color = customColors.rb2 ?? RB2_COLOR
+  const handleResetColors = () => setCustomColors({})
+
+  // 軸1〜6の名称編集（現場の実際の軸名が異なるため、初期名も変更できるようにする）
+  const [customAxisNames, setCustomAxisNames] = useState<string[]>([])
+  const axisNames = Array.from({ length: axisCount }, (_, i) => customAxisNames[i] ?? `軸${i + 1}`)
+  const handleAxisNameChange = (index: number, value: string) => {
+    setCustomAxisNames((prev) => {
+      const next = [...prev]
+      next[index] = value
+      return next
+    })
+  }
+  const handleResetAxisNames = () => setCustomAxisNames([])
+
   const axisRows: AxisRowData[] = Array.from({ length: axisCount }, (_, i) => ({
     axis: i + 1,
+    axisLabel: axisNames[i],
     rb1: {
       torqueValue: robotRB1.motors[i]?.torque ?? 0,
       torquePeak: robotRB1.motors[i]?.peakTorque ?? 0,
@@ -75,73 +96,187 @@ export default function OperationStatus({
   return (
     <PanelFrame className={`op-status op-status--${theme}`}>
       <div className="axis-monitor">
-        {/* 上部タイトルバー：タイトル・単位/凡例・現在時刻 */}
-        <div className="axis-monitor__topbar">
-          <div className="axis-monitor__title">軸モニタ ー RB1 / RB2 比較</div>
-          <div className="axis-monitor__unit">
-            トルク：定格トルク比 % ／ 速度：MAX比 %
-          </div>
-          <div className="axis-monitor__legend">
-            <span className="axis-monitor__legend-item axis-monitor__legend-item--peak">
-              <i />
-              ピーク値
-            </span>
-            <span className="axis-monitor__legend-item axis-monitor__legend-item--threshold">
-              <i style={{ borderColor: WARN_COLOR }} />
-              しきい値近接（{THRESHOLD}%〜）
-            </span>
-          </div>
-          <LiveClock />
-        </div>
+        <div className="axis-monitor__body">
+          <div className="axis-monitor__main-col">
+            {/* 上部タイトルバー：タイトル・単位/凡例・現在時刻 */}
+            <div className="axis-monitor__topbar" style={{ borderBottomColor: theme.border }}>
+              <div className="axis-monitor__title" style={{ color: theme.text }}>
+                軸モニタ ー RB1 / RB2 比較
+              </div>
+              <div className="axis-monitor__unit" style={{ color: theme.subtext }}>
+                トルク：定格トルク比 % ／ 速度：MAX比 %
+              </div>
+              <div className="axis-monitor__legend">
+                <span
+                  className="axis-monitor__legend-item axis-monitor__legend-item--peak"
+                  style={{ color: theme.subtext }}
+                >
+                  <i style={{ borderColor: theme.subtext }} />
+                  ピーク値
+                </span>
+                <span
+                  className="axis-monitor__legend-item axis-monitor__legend-item--threshold"
+                  style={{ color: theme.subtext }}
+                >
+                  <i style={{ borderColor: WARN_COLOR }} />
+                  しきい値近接（{THRESHOLD}%〜）
+                </span>
+              </div>
+              <LiveClock />
+            </div>
 
-        {/* RB1/RB2の稼働率バッジ＋中央見出し */}
-        <div className="axis-monitor__header-row">
-          <RobotHeaderBadge
-            label="RB1"
-            colorKey="RB1"
-            color={RB1_COLOR}
-            utilizationRate={robotRB1.utilizationRate}
-            align="left"
-          />
-          <div className="axis-monitor__header-center">
-            <div className="axis-monitor__header-center-title">軸別</div>
-            <div className="axis-monitor__header-center-caption">トルク・速度</div>
+            {/* RB1/RB2の稼働率バッジ＋中央見出し
+               ※稼働率バッジは、それぞれRB1/RB2の速度ゲージの列（左端／右端）の真上に
+                 くるようgrid-columnで明示的に位置合わせしている（従来は中央寄りにずれていた） */}
+            <div className="axis-monitor__header-row">
+              <div className="axis-monitor__header-rb1">
+                <RobotHeaderBadge
+                  label="RB1"
+                  colorKey="RB1"
+                  color={rb1Color}
+                  utilizationRate={robotRB1.utilizationRate}
+                  align="left"
+                  layout="stacked"
+                  textColor={rb1Color}
+                  captionColor={theme.subtext}
+                />
+              </div>
+              <div className="axis-monitor__header-center">
+                <div className="axis-monitor__header-center-title" style={{ color: theme.text }}>
+                  軸別
+                </div>
+                <div className="axis-monitor__header-center-caption" style={{ color: theme.subtext }}>
+                  トルク・速度
+                </div>
+              </div>
+              <div className="axis-monitor__header-rb2">
+                <RobotHeaderBadge
+                  label="RB2"
+                  colorKey="RB2"
+                  color={rb2Color}
+                  utilizationRate={robotRB2.utilizationRate}
+                  align="right"
+                  layout="stacked"
+                  textColor={rb2Color}
+                  captionColor={theme.subtext}
+                />
+              </div>
+            </div>
+
+            {/* 軸1〜6：モニタ表示（グリッド＋ゲージ）。モバイル幅ではCSSで非表示にする */}
+            <div className="axis-monitor__rows">
+              {axisRows.map((row) => (
+                <AxisRow
+                  key={row.axis}
+                  data={row}
+                  threshold={THRESHOLD}
+                  rb1Color={rb1Color}
+                  rb2Color={rb2Color}
+                  theme={theme}
+                />
+              ))}
+            </div>
+
+            {/* モバイル表示：グラフ／ゲージの代わりに表形式（横スクロール可）。
+               モニタ幅ではCSSで非表示にする */}
+            <AxisTable
+              rows={axisRows}
+              threshold={THRESHOLD}
+              rb1Color={rb1Color}
+              rb2Color={rb2Color}
+              theme={theme}
+            />
+
+            {/* 下部の補足 */}
+            <div
+              className="axis-monitor__footer"
+              style={{ borderTopColor: theme.border, color: theme.subtext }}
+            >
+              <span>棒グラフ：現在トルク%（内側＝軸ラベル側が現在値）</span>
+              <span>異常しきい値{THRESHOLD}%を超えると赤破線に接近</span>
+              <span>データ更新：現場PLC同期</span>
+            </div>
           </div>
-          <RobotHeaderBadge
-            label="RB2"
-            colorKey="RB2"
-            color={RB2_COLOR}
-            utilizationRate={robotRB2.utilizationRate}
-            align="right"
-          />
-        </div>
 
-        {/* 軸1〜6：中央ラベルを挟んでRB1/RB2のトルク・速度を左右対称に表示 */}
-        <div className="axis-monitor__rows">
-          {axisRows.map((row) => (
-            <AxisRow key={row.axis} data={row} threshold={THRESHOLD} />
-          ))}
-        </div>
+          {/* 編集パネル：RB1/RB2カラーと軸名を変更可能（モニタ・モバイル共通） */}
+          {isEditing && (
+            <div
+              className="axis-monitor__edit-panel"
+              style={{ background: theme.headerBg, borderColor: theme.border }}
+            >
+              <div className="axis-monitor__edit-panel-scroll">
+                <section className="axis-monitor__panel-section">
+                  <h3 style={{ color: theme.text }}>ロボットカラー</h3>
+                  <div className="axis-monitor__edit-group">
+                    <label className="axis-monitor__color-row">
+                      <span style={{ color: theme.subtext }}>RB1</span>
+                      <input
+                        type="color"
+                        value={rb1Color}
+                        onChange={(e) => setCustomColors((prev) => ({ ...prev, rb1: e.target.value }))}
+                      />
+                    </label>
+                    <label className="axis-monitor__color-row">
+                      <span style={{ color: theme.subtext }}>RB2</span>
+                      <input
+                        type="color"
+                        value={rb2Color}
+                        onChange={(e) => setCustomColors((prev) => ({ ...prev, rb2: e.target.value }))}
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="axis-monitor__panel-reset"
+                      style={{ borderColor: theme.border, color: theme.subtext }}
+                      onClick={handleResetColors}
+                    >
+                      色をリセット
+                    </button>
+                  </div>
+                </section>
 
-        {/* 下部の補足＋QRコード */}
-        <div className="axis-monitor__footer">
-          <span>棒グラフ：現在トルク%（内側＝軸ラベル側が現在値）</span>
-          <span>異常しきい値{THRESHOLD}%を超えると赤破線に接近</span>
-          <span>データ更新：現場PLC同期</span>
+                <section className="axis-monitor__panel-section">
+                  <h3 style={{ color: theme.text }}>軸の名称</h3>
+                  <p className="axis-monitor__hint" style={{ color: theme.subtext }}>
+                    現場の実際の軸名に合わせて変更できます。
+                  </p>
+                  <div className="axis-monitor__edit-group">
+                    {axisNames.map((name, i) => (
+                      <label key={i} className="axis-monitor__color-row">
+                        <span style={{ color: theme.subtext }}>軸{i + 1}</span>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => handleAxisNameChange(i, e.target.value)}
+                          style={{ borderColor: theme.border, color: theme.text }}
+                        />
+                      </label>
+                    ))}
+                    <button
+                      type="button"
+                      className="axis-monitor__panel-reset"
+                      style={{ borderColor: theme.border, color: theme.subtext }}
+                      onClick={handleResetAxisNames}
+                    >
+                      名称をリセット
+                    </button>
+                  </div>
+                </section>
+
+                <button
+                  type="button"
+                  className="axis-monitor__panel-reset"
+                  style={{ borderColor: theme.border, color: theme.subtext }}
+                  onClick={() => onEditingChange(false)}
+                >
+                  編集モードを終了
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <img src={qrUrl} alt="QRコード" className="axis-monitor__qr" />
-
-        {/* 編集モード：新レイアウト向けの位置編集は未実装。
-            トグル自体はSettingsPanelと同期を取るため残してあります。 */}
-        {isEditing && (
-          <div className="axis-monitor__edit-note">
-            編集モード：このページの表示位置編集は現在準備中です。
-            <button type="button" onClick={() => onEditingChange(false)}>
-              編集モードを終了
-            </button>
-          </div>
-        )}
       </div>
     </PanelFrame>
   )

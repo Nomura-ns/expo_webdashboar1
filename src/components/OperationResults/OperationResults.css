@@ -1,7 +1,9 @@
 .op-results {
   position: relative;
   display: flex;
+  flex: 1;          /* PanelFrame内で余白ではなく実際の高さいっぱいまで伸びる */
   flex-direction: column;
+  min-height: 0;    /* これが無いと中身の合計高さぶん膨張し、パネル下端を突き破る */
   gap: 6px;
 }
 
@@ -43,6 +45,14 @@
 
 .op-results__badge-unit {
   font-size: 20px;
+}
+
+/* モバイル版のNG回数バッジ：末尾にOK回数を括弧書きで添える */
+.op-results__badge-sub {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  margin-left: 2px;
 }
 
 /* ===== 全体サイクルタイム ===== */
@@ -104,7 +114,6 @@
 .op-results__robot-flows-header {
   display: flex;
   justify-content: flex-end;
-  transform: translateY(-35px);
 }
 
 .op-results__robot-col-title {
@@ -134,9 +143,8 @@
   display: flex;
   gap: 16px;
   flex: 1;
-  min-height: 230px;
+  min-height: 0;    /* 固定230pxをやめ、残りスペースに応じて縮小できるようにする */
   align-items: stretch;
-  transform: translateY(-57px);
 }
 
 .op-results__pie-panel,
@@ -235,12 +243,12 @@
   flex: 1;
   min-height: 0;
   gap: 12px;
-  transform: translateY(-40px);
 }
 
 .op-results__main-col {
   flex: 1;
   min-width: 0;
+  min-height: 0;    /* 同上：これが無いとcharts-rowがどれだけflex:1でも縮められない */
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -282,36 +290,6 @@
   line-height: 1.4;
 }
 
-.op-results__size-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.op-results__size-btn {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-}
-
-.op-results__size-input {
-  width: 60px;
-  height: 28px;
-  padding: 0 6px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: transparent;
-  text-align: center;
-  font-size: 13px;
-}
-
 .op-results__color-row {
   display: flex;
   align-items: center;
@@ -342,4 +320,48 @@
   background: transparent;
   cursor: pointer;
   align-self: flex-start;
+}
+
+/* ===== モニタ（52インチ等の大画面）向け文字サイズ調整 =====
+   768px超（モバイル以外）が対象。固定幅の箇所は文字が被らないよう幅も広げる */
+@media (min-width: 769px) {
+  .op-results__badge-label {
+    font-size: 15px;
+  }
+  .op-results__badge-value {
+    font-size: 21px;
+  }
+  .op-results__badge-unit {
+    font-size: 22px;
+  }
+
+  .op-results__cycle-badge {
+    flex-basis: 220px;
+  }
+  .op-results__cycle-badge-label {
+    font-size: 15px;
+  }
+  .op-results__cycle-badge-value {
+    font-size: 21px;
+  }
+
+  .op-results__robot-col-title {
+    font-size: 16px;
+  }
+  .op-results__robot-col-cycle {
+    font-size: 14px;
+  }
+  .op-results__robot-col-cycle strong {
+    font-size: 16px;
+  }
+
+  .op-results__panel-title {
+    font-size: 17px;
+  }
+  .op-results__legend-item {
+    font-size: 15px;
+  }
+  .op-results__color-row-label {
+    font-size: 15px;
+  }
 }

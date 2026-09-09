@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import type { Theme } from '../../types'
+import { useIsMobile } from '../../hooks/useMediaQuery'
 import './JobFlowDiagram.css'
 
 interface FlowNodeDef {
@@ -110,40 +111,43 @@ interface SizingConfig {
   lineHeight: number
 }
 
-/** ノード1個あたりの最小幅目安（全角1文字＝約15px、左右余白込み）。ラベルの被りを防ぐため文字数に応じて広げる */
-function estimateNodeWidth(label: string, minWidth: number, charPx = 15, padding = 28) {
+/** ノード1個あたりの最小幅目安（全角1文字＝約17px、左右余白込み）。ラベルの被りを防ぐため文字数に応じて広げる
+ *  ※このフロー図（FlowCanvas）はモニタ（52インチ等の大画面）専用表示。モバイルは
+ *  CurrentStepView（現在工程のみのシンプル表示）を使うため、文字サイズと箱の大きさは
+ *  常にモニタでの視認性を優先してよい（下のCSSのフォントサイズと連動させること）。 */
+function estimateNodeWidth(label: string, minWidth: number, charPx = 17, padding = 30) {
   const longestLine = Math.max(...label.split('\n').map((l) => l.length))
   return Math.max(minWidth, longestLine * charPx + padding)
 }
 
 const OVERALL_SIZING: SizingConfig = {
-  boxW: 150,
-  boxH: 52,
-  diamondW: 104,
-  diamondH: 78,
-  termW: 76,
-  termH: 36,
-  gapX: 40,
+  boxW: 165,
+  boxH: 58,
+  diamondW: 114,
+  diamondH: 86,
+  termW: 82,
+  termH: 40,
+  gapX: 42,
   leftPad: 16,
   rightPad: 16,
-  topPad: 18,
-  bottomPad: 18,
-  lineHeight: 16,
+  topPad: 20,
+  bottomPad: 20,
+  lineHeight: 18,
 }
 
 const ROBOT_SIZING: SizingConfig = {
-  boxW: 128,
-  boxH: 46,
-  diamondW: 100,
-  diamondH: 72,
-  termW: 64,
-  termH: 32,
-  gapX: 34,
+  boxW: 140,
+  boxH: 52,
+  diamondW: 110,
+  diamondH: 80,
+  termW: 70,
+  termH: 36,
+  gapX: 36,
   leftPad: 14,
   rightPad: 14,
-  topPad: 16,
-  bottomPad: 16,
-  lineHeight: 15,
+  topPad: 18,
+  bottomPad: 18,
+  lineHeight: 17,
 }
 
 interface HorizontalPositioned {
@@ -389,6 +393,74 @@ function FlowPanel({ theme, title, progress, children }: FlowPanelProps) {
   )
 }
 
+/** モバイルで表示する「現在工程」の中身（通常の工程名、または判定確定後のOK/NGチップ） */
+interface CurrentStepInfo {
+  label: string
+  chipColor?: string
+}
+
+/** activeStepに対応する「現在工程」を1件だけ探す。判定確定後はOK/NGチップに差し替える */
+function findCurrentStep(
+  nodes: FlowNodeDef[],
+  activeStep: number | undefined,
+  resolvedChip?: ResolvedChip
+): CurrentStepInfo | undefined {
+  if (activeStep === undefined) return undefined
+  let current: FlowNodeDef | undefined
+  nodes.forEach((n) => {
+    if (n.plcStep !== undefined && n.plcStep <= activeStep) current = n
+  })
+  if (!current) return undefined
+  if (resolvedChip && current.id === resolvedChip.nodeId) {
+    return { label: resolvedChip.label, chipColor: resolvedChip.color }
+  }
+  return { label: current.label.replace(/\n/g, ' ') }
+}
+
+/** モバイル専用：フロー図（横スクロール）の代わりに現在工程だけをシンプルに表示する */
+function CurrentStepView({
+  theme,
+  title,
+  progress,
+  current,
+}: {
+  theme: Theme
+  title: string
+  progress: { current: number; total: number }
+  current?: CurrentStepInfo
+}) {
+  return (
+    <div className="flow-diagram-panel">
+      <div className="flow-diagram-panel-head">
+        <span className="flow-diagram-panel-title" style={{ color: theme.text }}>
+          {title}
+        </span>
+        <span className="flow-diagram-progress" style={{ color: theme.subtext }}>
+          進捗 {progress.current || '--'}/{progress.total}工程
+        </span>
+      </div>
+      <div className="flow-current-step" style={{ borderColor: theme.border, background: theme.surface }}>
+        {current ? (
+          <span
+            className="flow-current-step__label"
+            style={
+              current.chipColor
+                ? { background: current.chipColor, color: '#fff' }
+                : { color: theme.text }
+            }
+          >
+            {current.label}
+          </span>
+        ) : (
+          <span className="flow-current-step__label" style={{ color: theme.subtext }}>
+            --
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 interface JobFlowDiagramProps {
   theme: Theme
   /** PLCのDレジスタ（現在工程ステップ）から受け取る値。該当工程を強調表示します。 */
@@ -397,10 +469,18 @@ interface JobFlowDiagramProps {
   ngSignal?: boolean
 }
 
-/** 全体フロー図（自動スライド方式・枠で囲んだ表示）。RB1／RB2は RobotFlows を使用してください。 */
+/** 全体フロー図（自動スライド方式・枠で囲んだ表示）。RB1／RB2は RobotFlows を使用してください。
+ *  モバイルでは横スクロールのフロー図自体が不要なため、現在工程のみを表示する簡易ビューに切り替える。 */
 export default function JobFlowDiagram({ theme, activeStep, ngSignal }: JobFlowDiagramProps) {
+  const isMobile = useIsMobile()
   const { nodes, resolved, progress } = resolveOverallFlow(activeStep, ngSignal)
   const resolvedChip = resolved ? { nodeId: 'ov-d', label: ngSignal ? 'NG' : 'OK', color: ngSignal ? NG_COLOR : OK_COLOR } : undefined
+
+  if (isMobile) {
+    const current = findCurrentStep(nodes, activeStep, resolvedChip)
+    return <CurrentStepView theme={theme} title="全体フロー" progress={progress} current={current} />
+  }
+
   return (
     <FlowPanel theme={theme} title="全体フロー" progress={progress}>
       <FlowCanvas
@@ -417,10 +497,24 @@ export default function JobFlowDiagram({ theme, activeStep, ngSignal }: JobFlowD
   )
 }
 
-/** RB1／RB2フロー。全体フローと同じ矩形・ひし形・端子の形状を用い、それぞれ枠で囲んで表示する。 */
+/** RB1／RB2フロー。全体フローと同じ矩形・ひし形・端子の形状を用い、それぞれ枠で囲んで表示する。
+ *  モバイルでは横スクロールが不要なため、各ロボットの現在工程のみを表示する。 */
 export function RobotFlows({ theme, activeStep }: { theme: Theme; activeStep?: number }) {
+  const isMobile = useIsMobile()
   const rb1Progress = computeProgress(RB1_FLOW, activeStep)
   const rb2Progress = computeProgress(RB2_FLOW, activeStep)
+
+  if (isMobile) {
+    const rb1Current = findCurrentStep(RB1_FLOW, activeStep)
+    const rb2Current = findCurrentStep(RB2_FLOW, activeStep)
+    return (
+      <div className="flow-robot-panels">
+        <CurrentStepView theme={theme} title="RB1フロー" progress={rb1Progress} current={rb1Current} />
+        <CurrentStepView theme={theme} title="RB2フロー" progress={rb2Progress} current={rb2Current} />
+      </div>
+    )
+  }
+
   return (
     <div className="flow-robot-panels">
       <FlowPanel theme={theme} title="RB1フロー" progress={rb1Progress}>

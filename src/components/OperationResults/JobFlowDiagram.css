@@ -6,7 +6,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transform: translateY(-25px);
 }
 
 .flow-diagram-panel-head {
@@ -31,12 +30,25 @@
   font-family: var(--font-mono);
 }
 
+/* ===== モニタ（52インチ等の大画面）向け：見出し・進捗文字を拡大 =====
+   768px超（モバイル以外）が対象。モバイルは現在工程のみの簡易表示のため元のサイズのまま */
+@media (min-width: 769px) {
+  .flow-diagram-panel-title {
+    font-size: 15px;
+  }
+  .flow-diagram-progress {
+    font-size: 13px;
+  }
+  .flow-diagram-note {
+    font-size: 13px;
+  }
+}
+
 /* RB1／RB2フローを縦に並べる */
 .flow-robot-panels {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transform: translateY(-20pX);
 }
 
 /* SVGをそのままの大きさで描画し、はみ出した分は
@@ -61,10 +73,34 @@
   display: none;
 }
 
-.flow__label { font-size: 17px; font-family: var(--font-mono); }
-.flow__label--sm { font-size: 13px; font-family: var(--font-mono); }
-.flow__terminal-label { font-size: 15px; font-weight: 600; font-family: var(--font-mono); }
-.flow__branch-label { font-size: 12px; font-family: var(--font-mono); font-weight: 700; }
+/* FlowCanvas（SVGフロー図）はモニタ（大画面）専用表示。JobFlowDiagram.tsx側の
+   OVERALL_SIZING／ROBOT_SIZING／estimateNodeWidthの箱サイズと連動しているため、
+   ここを変更する場合は必ずJS側の寸法も合わせて調整すること（被り防止） */
+.flow__label { font-size: 19px; font-family: var(--font-mono); }
+.flow__label--sm { font-size: 15px; font-family: var(--font-mono); }
+.flow__terminal-label { font-size: 17px; font-weight: 600; font-family: var(--font-mono); }
+.flow__branch-label { font-size: 14px; font-family: var(--font-mono); font-weight: 700; }
+
+/* ===== モバイル用：現在工程のみのシンプル表示（フロー図の横スクロール代替） ===== */
+.flow-current-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+}
+
+.flow-current-step__label {
+  font-size: 15px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-align: center;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
 
 /* アクティブ工程（PLCの現在ステップ）の強調表示 */
 .flow__node--active rect,

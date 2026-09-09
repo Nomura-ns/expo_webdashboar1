@@ -511,9 +511,9 @@ function NameplateQuizPreview({ theme }: { theme: Theme }) {
     </div>
   )
 }
-// =============================================
-// サイドバー本体
-// =============================================
+// スライドパネルの幅。ブックマークタブの水平位置もこの値を基準に計算するため、
+// ここを変えれば両方が連動して動く。
+const SIDEBAR_WIDTH = 280
 
 type Props = {
   theme: Theme
@@ -613,11 +613,10 @@ export default function Sidebar({
       {/* ブックマークタブ */}
       <div style={{
         position: 'fixed',
-        top: '9.2%',
-        left: sidebarOpen ? '9.9%' : '-1.6%',
+        top: '57px', // スライドパネル側のtopと同じ基準（ヘッダー高さ）に揃える
+        left: sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px',
         display: 'flex', flexDirection: 'column',
         alignItems: 'flex-start',
-        paddingTop: '20px',
         zIndex: 50,
         transition: 'left 0.2s ease',
       }}>
@@ -646,9 +645,13 @@ export default function Sidebar({
     cursor: 'pointer',
     transition: 'all 0.2s',
 
-    /* ← rotate 後の位置調整を少しマイルドに */
-    transform: 'rotate(90deg) translateX(40px) translateY(60px)',
-    transformOrigin: 'right center',
+    /* rotate(90deg)を要素自身の左上を基準に回転させたあと、
+       translateY(-100%)＝自分自身の高さぶんだけ（％指定なので常に正確に）
+       引き戻すことで、画面サイズに関わらず必ず左端ぴったりに揃う。
+       以前のtranslateX(40px)/translateY(60px)は特定の画面幅でしか
+       合わない当て推量だったため廃止。 */
+    transform: 'rotate(90deg) translateY(-100%)',
+    transformOrigin: 'top left',
 
     whiteSpace: 'nowrap',
   }}
@@ -667,7 +670,7 @@ export default function Sidebar({
        onMouseLeave={onClose}
        style={{
         position: 'fixed', top: '57px', left: 0,
-        bottom: `${footerHeight}px`, width: sidebarOpen ? '220px' : '0px',
+        bottom: `${footerHeight}px`, width: sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px',
         background: theme.surface,
         borderRight: sidebarOpen ? `1px solid ${theme.border}` : 'none',
         overflow: 'hidden',

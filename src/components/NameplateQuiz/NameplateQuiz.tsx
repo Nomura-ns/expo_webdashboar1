@@ -23,6 +23,7 @@ interface NameplateQuizProps {
   themeMode: ThemeMode
   isAdminOpen: boolean
   onAdminOpenChange: (open: boolean) => void
+  dateOptions: { label: string; value: string }[] 
 }
 
 function shuffledOrder(questions: NameplateQuestion[]): string[] {
@@ -44,31 +45,14 @@ function shuffledChoiceOrder(choiceCount: number): number[] {
   return indices
 }
 
-// 直近5日分の日付（'YYYY-MM-DD'キー / 'MM/DD'表示ラベル）。管理ページの日付フィルタ用。
-function recentDateOptions(days = 5): { label: string; value: string }[] {
-  const out: { label: string; value: string }[] = []
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    out.push({ label: `${m}/${day}`, value: `${y}-${m}-${day}` })
-  }
-  return out
-}
 
 export default function NameplateQuiz({
-  theme, questions, themeMode, isAdminOpen, onAdminOpenChange,
+  theme, questions, themeMode, isAdminOpen, onAdminOpenChange, dateOptions,
 }: NameplateQuizProps) {
   const { logAnswer, getOverallStats, getBreakdown, getDailyCorrectRates } = useQuizAnswerLog()
   const { progress, setProgress } = useQuizProgressCache()
   const isMobile = useIsMobile()
-
   const [overall, setOverall] = useState({ totalAnswered: 0, totalCorrect: 0 })
-
-  const dateOptions = useMemo(() => recentDateOptions(5), [])
-
   const currentQuestionId = progress.order[progress.currentIndex] ?? null
   const question = useMemo(
     () => questions.find((q) => q.id === currentQuestionId) ?? null,
@@ -77,7 +61,6 @@ export default function NameplateQuiz({
   const currentVideoUrl = question?.videoUrl?.[themeMode]
   const currentIconUrl = question?.iconUrl?.[themeMode]
   const isLastQuestion = progress.currentIndex === progress.order.length - 1
-
   const [videoReady, setVideoReady] = useState(false)
 
   useEffect(() => {

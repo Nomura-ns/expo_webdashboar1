@@ -28,11 +28,11 @@ type CategoryTab = (typeof CATEGORY_TABS)[number]
 // モニタ表示のグラフで使う色。テーマの accent とは別に、5カテゴリを見分けやすい
 // 固定パレットにしている（配色自体を変えたい場合はここだけ調整すればよい）。
 const CATEGORY_COLORS: Record<CategoryTab, string> = {
-  '全体': '#94a3b8',
-  '運転起動': '#e08a4c',
-  '停止': '#7a3b2c',
-  'エラーリセット': '#cbb787',
-  'カウンタリセット': '#8b9c8a',
+  '全体': '#cbd5e1',
+  '運転起動': '#fb923c',
+  '停止': '#f87171',
+  'エラーリセット': '#fde047',
+  'カウンタリセット': '#4ade80',
 }
 
 // モニタ表示は常時開きっぱなしのため、定期的に再取得して反映する。
@@ -120,6 +120,7 @@ export default function AdminResultsPanel({
     const barW =
       dateCount > 0 ? (groupW - barGap * (CATEGORY_TABS.length - 1)) / CATEGORY_TABS.length : 0
 
+      
     return (
       <div className="admin-panel__embed" style={themeVars}>
         <div className="admin-panel__modal admin-panel__modal--embedded">
@@ -144,15 +145,26 @@ export default function AdminResultsPanel({
                         const x = groupX + ci * (barW + barGap)
                         const y = padY + (plotH - h)
                         return (
-                          <rect
-                            key={cat}
-                            x={x}
-                            y={y}
-                            width={Math.max(barW, 0)}
-                            height={Math.max(h, 0)}
-                            rx={2}
-                            style={{ fill: CATEGORY_COLORS[cat] }}
-                          />
+                          <g key={cat}>
+                            <rect
+                              x={x}
+                              y={y}
+                              width={Math.max(barW, 0)}
+                              height={Math.max(h, 0)}
+                              rx={2}
+                              style={{ fill: CATEGORY_COLORS[cat] }}
+                            />
+                            {rate && (
+                              <text
+                                x={x + barW / 2}
+                                y={y - 8}
+                                textAnchor="middle"
+                                className="admin-panel__chart-bar-value"
+                              >
+                                {rate.correctRate}
+                              </text>
+                            )}
+                          </g>
                         )
                       })}
                       <text

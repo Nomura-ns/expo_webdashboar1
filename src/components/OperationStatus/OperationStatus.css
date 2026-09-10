@@ -6,7 +6,7 @@
   flex: 1;
   min-height: 0;
   height: 100%;
-  position: relative; /* QRコードを右下に絶対配置するための基準 */
+  position: relative;
   overflow: hidden;
 }
 
@@ -28,17 +28,19 @@
   gap: 10px;
 }
 
-/* 軸ラベル列の幅・速度ゲージ列の幅を、ヘッダー行・データ行の両方で揃えるための共通グリッド */
+/* 軸ラベル列の幅・速度ゲージ列の幅を、ヘッダー行・データ行の両方で揃えるための共通グリッド
+   ※以前は端の列が100pxしか無く、速度ゲージ・稼働率ドーナツが窮屈で小さく見える
+     原因になっていたため、150pxに拡幅した */
 .axis-monitor__header-row {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr) 150px minmax(0, 1fr) 100px;
+  grid-template-columns: 150px minmax(0, 1fr) 150px minmax(0, 1fr) 150px;
   align-items: center;
   column-gap: 14px;
 }
 
 .axis-row {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr) 150px minmax(0, 1fr) 100px;
+  grid-template-columns: 150px minmax(0, 1fr) 150px minmax(0, 1fr) 150px;
   align-items: stretch; /* center -> stretch: 行の高さぴったりに子要素を伸ばし、はみ出しを防ぐ */
   column-gap: 14px;
 }
@@ -62,7 +64,7 @@
 }
 
 .axis-monitor__unit {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--text-secondary, #9aa4b2);
 }
 
@@ -77,25 +79,68 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px; /* 12px→13px：52インチ視聴での視認性向上 */
+  font-size: 18px; /* 12px→13px：52インチ視聴での視認性向上 */
   color: var(--text-secondary, #9aa4b2);
   white-space: nowrap;
 }
 
 .axis-monitor__legend-item--peak i {
   width: 0;
-  height: 12px;
+  height: 15px;
   border-left: 2px solid var(--text-secondary, #9aa4b2);
 }
 
 .axis-monitor__legend-item--threshold i {
   width: 0;
-  height: 12px;
+  height: 15px;
   border-left: 2px dashed;
 }
 
+/* ===== 編集モード切替スイッチ =====
+   汎用のトグルスイッチ見た目。編集パネル先頭の「編集モード」行で使用する。 */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.toggle-switch__input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.toggle-switch__track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--border-soft, #2a3650);
+  transition: background 0.2s ease;
+}
+
+.toggle-switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch--on .toggle-switch__thumb {
+  transform: translateX(18px);
+}
+
 .axis-monitor__clock {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-secondary, #9aa4b2);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -137,12 +182,12 @@
   justify-content: flex-end;
 }
 
-/* 速度ゲージ列（幅100px）に収まるよう、ドーナツ→テキストを縦積みするレイアウト */
+/* 速度ゲージ列（幅150pxに拡幅）に収まるよう、ドーナツ→テキストを縦積みするレイアウト */
 .robot-header-badge--stacked {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 8px; /* 2px→6px→8px：ドーナツとRB1/RB2テキストの間にさらに余白を確保 */
   text-align: center;
 }
 
@@ -167,7 +212,7 @@
 }
 
 .robot-header-badge--stacked .robot-header-badge__title {
-  font-size: 15px;
+  font-size: 19px;
 }
 
 .robot-header-badge__caption {
@@ -176,7 +221,7 @@
 }
 
 .robot-header-badge--stacked .robot-header-badge__caption {
-  font-size: 10px;
+  font-size: 15px;
   white-space: nowrap;
 }
 
@@ -198,23 +243,51 @@
   color: var(--text-secondary, #9aa4b2);
 }
 
-/* 稼働率ドーナツ：ヘッダーバッジ内に収まるようコンパクト化 */
+/* 稼働率ドーナツ：ヘッダーバッジ内に収まるようコンパクト化
+   ※列幅を150pxに拡幅したのに合わせてドーナツ自体も大きくした（72px→96px→88px）。
+   また、数字と%記号・キャプションが重なって表示される不具合があったため、
+   ドーナツ中央のテキストレイアウトをここで明示的に固定（横並び・折り返し無し・
+   中央揃え）し、ベースのUtilizationRateDisplay側のスタイルに依存しないようにした。
+   さらに、__ring に position:relative／__center に position:absolute; inset:0 を
+   ここで明示することで、中央の数字がリング枠の外（＝下のRB1/RB2ラベル側）に
+   はみ出して重なって見える事故を防ぐ（ベースCSS側の指定に依存しない）。 */
 .utilization-donut--compact .utilization-donut__ring {
-  width: px; /* 64px→56px：縦積みレイアウトで幅100px列に収まりやすくする */
-  height: 56px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+}
+
+.utilization-donut--compact .utilization-donut__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 1px;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 .utilization-donut--compact .utilization-donut__number {
-  font-size: 16px;
+  font-size: 28px;
+  line-height: 1;
 }
 
 .utilization-donut--compact .utilization-donut__percent {
-  font-size: 10px;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .utilization-donut--compact .utilization-donut__value,
 .utilization-donut--compact .utilization-donut__track {
-  stroke-width: 12;
+  fill: none;
+  stroke-width: 14;
 }
 
 /* ===== 軸1〜6の行 ===== */
@@ -363,12 +436,14 @@
   height: 100%;
   min-height: 0;
   width: 100%;
-  padding: 0 4px;
+  /* 下側にバブル（数値）を移動したため、その分の余白をpadding-bottomで確保する
+     （TorqueBarのpadding-topでピークラベル用の余白を確保しているのと同じ考え方） */
+  padding: 0 4px 26px;
   box-sizing: border-box;
 }
 
 .speed-bar__label {
-  font-size: 11px;
+  font-size: 14px; /* 13px→14px：視認性向上 */
   color: var(--text-secondary, #9aa4b2);
   white-space: nowrap;
 }
@@ -376,10 +451,10 @@
 .speed-bar__track {
   position: relative;
   width: 100%;
-  height: 12px;
-  border-radius: 6px;
+  height: 22px; /* 18px→22px：視認性向上 */
+  border-radius: 11px;
   background: var(--bg-inset, rgba(255, 255, 255, 0.08));
-  overflow: visible; /* 数値バブルが上にはみ出せるように */
+  overflow: visible; /* 数値バブルが下にはみ出せるように */
 }
 
 .speed-bar__fill {
@@ -387,17 +462,19 @@
   top: 0;
   bottom: 0;
   left: 0;
-  border-radius: 6px;
+  border-radius: 11px;
   transition: width 0.3s ease;
 }
 
 .speed-bar__bubble {
   position: absolute;
-  top: -22px;
+  /* 「速度」ラベルはトラックの上にあるため、数値バブルは上ではなく下に出すことで
+     重なりを解消する */
+  top: calc(100% + 8px);
   transform: translateX(-50%);
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 15px; /* 14px→15px：視認性向上 */
   font-weight: 800;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -500,7 +577,8 @@
   gap: 16px;
   flex: 0 0 auto;
   padding-top: 4px;
-  padding-right: 84px; /* 右下のQRコードと重ならないよう余白を確保 */
+  /* QR避けはPanelFrameのreserveForQr(clip-path + panel-frame__bodyのpadding)に一本化したため、
+     ここでの決め打ちのpadding-rightは廃止（残すと二重に余白を取ってしまう） */
   border-top: 1px solid var(--border-soft);
   font-size: 12px; /* 11px→12px：52インチ視聴での視認性向上 */
   color: var(--text-secondary, #9aa4b2);
@@ -511,23 +589,14 @@
   white-space: nowrap;
 }
 
-/* ===== QRコード（右下） ===== */
-
-.axis-monitor__qr {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-}
-
 /* ===== 編集パネル（RB1/RB2カラー・軸名） ===== */
 
 .axis-monitor__edit-panel {
-  width: 260px;
+  width: 280px;
   flex-shrink: 0;
-  border-left: 1px solid var(--border-soft);
+  border: 1px solid var(--border-soft, #2a3650);
+  border-radius: 6px;
+  box-sizing: border-box;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -537,6 +606,23 @@
   flex: 1;
   overflow-y: auto;
   padding: 14px;
+}
+
+/* 編集モードON/OFFトグル：パネル最上部に配置（他ページの編集パネルと統一） */
+.axis-monitor__panel-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.axis-monitor__panel-toggle-state {
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .axis-monitor__panel-section {
@@ -627,7 +713,7 @@
 @media (max-width: 900px) {
   .axis-monitor__header-row,
   .axis-row {
-    grid-template-columns: 74px minmax(0, 1fr) 100px minmax(0, 1fr) 74px;
+    grid-template-columns: 100px minmax(0, 1fr) 120px minmax(0, 1fr) 100px;
     column-gap: 8px;
   }
 
@@ -641,13 +727,22 @@
 
   .axis-monitor__edit-panel {
     width: 100%;
-    border-left: none;
-    border-top: 1px solid var(--border-soft);
+    border: 1px solid var(--border-soft);
     max-height: 45vh;
   }
 
   .axis-monitor__body {
     flex-direction: column;
+  }
+
+  /* 100px幅の列に収まるよう、拡大した稼働率ドーナツを少し縮める */
+  .utilization-donut--compact .utilization-donut__ring {
+    width: 70px;
+    height: 70px;
+  }
+
+  .utilization-donut--compact .utilization-donut__number {
+    font-size: 18px;
   }
 }
 
@@ -672,7 +767,4 @@
     padding-right: 0;
   }
 
-  .axis-monitor__qr {
-    display: none; /* 表スクロール中に右下固定QRが表と重なるため、モバイルでは非表示 */
-  }
 }

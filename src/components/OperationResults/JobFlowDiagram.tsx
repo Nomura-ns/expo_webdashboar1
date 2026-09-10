@@ -115,39 +115,39 @@ interface SizingConfig {
  *  ※このフロー図（FlowCanvas）はモニタ（52インチ等の大画面）専用表示。モバイルは
  *  CurrentStepView（現在工程のみのシンプル表示）を使うため、文字サイズと箱の大きさは
  *  常にモニタでの視認性を優先してよい（下のCSSのフォントサイズと連動させること）。 */
-function estimateNodeWidth(label: string, minWidth: number, charPx = 17, padding = 30) {
+function estimateNodeWidth(label: string, minWidth: number, charPx = 20, padding = 34) {
   const longestLine = Math.max(...label.split('\n').map((l) => l.length))
   return Math.max(minWidth, longestLine * charPx + padding)
 }
 
 const OVERALL_SIZING: SizingConfig = {
-  boxW: 165,
-  boxH: 58,
-  diamondW: 114,
-  diamondH: 86,
-  termW: 82,
-  termH: 40,
-  gapX: 42,
-  leftPad: 16,
-  rightPad: 16,
-  topPad: 20,
-  bottomPad: 20,
-  lineHeight: 18,
+  boxW: 195,
+  boxH: 74,
+  diamondW: 138,
+  diamondH: 108,
+  termW: 96,
+  termH: 50,
+  gapX: 50,
+  leftPad: 18,
+  rightPad: 18,
+  topPad: 24,
+  bottomPad: 24,
+  lineHeight: 21,
 }
 
 const ROBOT_SIZING: SizingConfig = {
-  boxW: 140,
-  boxH: 52,
-  diamondW: 110,
-  diamondH: 80,
-  termW: 70,
-  termH: 36,
-  gapX: 36,
-  leftPad: 14,
-  rightPad: 14,
-  topPad: 18,
-  bottomPad: 18,
-  lineHeight: 17,
+  boxW: 168,
+  boxH: 66,
+  diamondW: 132,
+  diamondH: 100,
+  termW: 84,
+  termH: 44,
+  gapX: 44,
+  leftPad: 16,
+  rightPad: 16,
+  topPad: 22,
+  bottomPad: 22,
+  lineHeight: 20,
 }
 
 interface HorizontalPositioned {

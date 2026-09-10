@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import PanelFrame from '../common/PanelFrame'
 import JobFlowDiagram, { RobotFlows } from './JobFlowDiagram'
 import { useIsMobile } from '../../hooks/useMediaQuery'
-import type { Theme, ThemeMode } from '../../types'
+import type { Theme } from '../../types'
 import './OperationResults.css'
 
 /** 稼働実績（検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数・検査OK/NG）の日別データ */
@@ -28,8 +28,6 @@ type MetricKey = Exclude<keyof MetricPoint, 'date'>
 
 interface OperationResultsProps {
   theme: Theme
-  /** ライト／ダーク（QRコード画像の切替などに使用） */
-  themeMode: ThemeMode
   isEditing: boolean
   /** PLCのDアドレスから受け取る現在工程ステップ値。フロー図の該当工程を強調表示します。 */
   activeStep?: number
@@ -101,7 +99,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max)
 }
 
-/** マウス／タッチのクライアント座標をSVGのユーザー座標系に変換 */
 function toSvgPoint(svg: SVGSVGElement, clientX: number, clientY: number) {
   const pt = svg.createSVGPoint()
   pt.x = clientX
@@ -133,7 +130,6 @@ interface ChartItem {
 
 export default function OperationResults({
   theme,
-  themeMode,
   isEditing,
   activeStep,
   metrics,
@@ -146,9 +142,19 @@ export default function OperationResults({
   const isMobile = useIsMobile()
   const [customColors, setCustomColors] = useState<Record<string, string>>({})
   const [pieLayout, setPieLayout] = useState<PieLayout>(DEFAULT_PIE_LAYOUT)
-
   const pieSvgRef = useRef<SVGSVGElement | null>(null)
   const isDraggingPieRef = useRef(false)
+
+  /** モニタごとの実高さの違い（52インチ／55インチ等）に自動追従して、コンテンツ全体を
+   *  「はみ出さない最大サイズ」にスケールするための仕組み。
+   *  scale-outer（枠＝実際に使える高さ、overflow:hidden）と scale-inner（中身の自然な高さ）
+   *  を比較し、収まる倍率をtransform: scale()で掛ける。これにより:
+   *  ・高さに余裕がある画面では拡大され、下部グラフも含め全体が大きく表示される
+   *  ・高さが厳しい画面（55インチ等）でも一律に縮むだけで、途中で切れることがなくなる
+   *  （スクロール前提にできないダッシュボード表示のため） */
+  const scaleOuterRef = useRef<HTMLDivElement | null>(null)
+  const scaleInnerRef = useRef<HTMLDivElement | null>(null)
+  const [contentScale, setContentScale] = useState(1)
 
   const dates = metrics.map((m) => m.date)
   const latest = metrics.at(-1)
@@ -198,12 +204,10 @@ const gridLines = 4
   }
 
   const handleResetColors = () => setCustomColors({})
-
-  /** 大きさの編集機能は廃止したため、リセットは位置（cx, cy）のみを初期値に戻す */
   const handleResetPieLayout = () => setPieLayout({ ...DEFAULT_PIE_LAYOUT })
 
   const beginPieDrag = (e: PointerEvent<SVGElement>) => {
-    if (!isEditing) return
+    if (!isEditing || isMobile) return
     e.stopPropagation()
     isDraggingPieRef.current = true
     ;(e.target as Element).setPointerCapture(e.pointerId)
@@ -213,7 +217,6 @@ const gridLines = 4
     const svg = pieSvgRef.current
     if (!isDraggingPieRef.current || !svg) return
     const p = toSvgPoint(svg, e.clientX, e.clientY)
-
     setPieLayout((prev) => ({
       ...prev,
       cx: clamp(p.x, DEFAULT_PIE_R, CHART_W - DEFAULT_PIE_R),
@@ -230,12 +233,48 @@ const gridLines = 4
     }
   }
 
-  const qrSrc = themeMode === 'dark' ? '/QR_dark.png' : '/QR_light.png'
+  useEffect(() => {
+    const outer = scaleOuterRef.current
+    const inner = scaleInnerRef.current
+    if (!outer || !inner) return
+
+    let frame = 0
+    const recompute = () => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        const availableH = outer.clientHeight
+        const naturalH = inner.offsetHeight
+        if (availableH <= 0 || naturalH <= 0) return
+        // 上限1.6倍まで拡大可（余白を有効活用）、下限0.55倍まで縮小可（極端な潰れ防止）
+        const next = clamp(availableH / naturalH, 0.55, 1.6)
+        setContentScale((prev) => (Math.abs(prev - next) > 0.01 ? next : prev))
+      })
+    }
+
+    const ro = new ResizeObserver(recompute)
+    ro.observe(outer)
+    ro.observe(inner)
+    recompute()
+
+    return () => {
+      cancelAnimationFrame(frame)
+      ro.disconnect()
+    }
+  }, [metrics, activeStep, ngSignal, isMobile, overallCycleTimeSec, rb1CycleTimeSec, rb2CycleTimeSec])
 
   return (
-    <PanelFrame className="op-results">
+    <PanelFrame className="op-results" reserveForQr>
       <div className="op-results__body">
         <div className="op-results__main-col">
+          <div className="op-results__scale-outer" ref={scaleOuterRef}>
+            <div
+              className="op-results__scale-inner"
+              ref={scaleInnerRef}
+              style={{
+                transform: `scale(${contentScale})`,
+                width: contentScale !== 1 ? `${100 / contentScale}%` : '100%',
+              }}
+            >
           {/* 上部：検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数 */}
           <div className="op-results__badges">
             {badgeDefs.map((def) => (
@@ -483,117 +522,81 @@ const gridLines = 4
               </div>
             </div>
           )}
+            </div>
+          </div>
         </div>
 
-        {isEditing && (
+        {isEditing && !isMobile && (
           <div className="op-results__edit-panel" style={{ background: theme.headerBg, borderColor: theme.border }}>
             <div className="op-results__edit-panel-scroll">
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
                 <span style={{ fontSize: '14px', color: theme.text }}>編集モード</span>
-                <label style={{ position: 'relative', display: 'inline-block', width: '44px', height: '24px' }}>
+                <label className={`toggle-switch${isEditing ? ' toggle-switch--on' : ''}`}>
                   <input
                     type="checkbox"
-                    id="editMode"
-                    name="editMode"
+                    className="toggle-switch__input"
                     checked={isEditing}
                     onChange={(e) => onEditingChange(e.target.checked)}
-                    style={{ opacity: 0, width: 0, height: 0 }}
+                    aria-label="編集モードの切替"
                   />
                   <span
-                    style={{
-                      position: 'absolute',
-                      cursor: 'pointer',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: isEditing ? theme.accent : '#ccc',
-                      borderRadius: '24px',
-                      transition: '0.2s',
-                    }}
+                    className="toggle-switch__track"
+                    style={{ background: isEditing ? theme.accent : theme.border }}
                   >
-                    <span
-                      style={{
-                        position: 'absolute',
-                        height: '18px',
-                        width: '18px',
-                        left: isEditing ? '23px' : '3px',
-                        bottom: '3px',
-                        backgroundColor: '#fff',
-                        borderRadius: '50%',
-                        transition: '0.2s',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.3)',
-                      }}
-                    />
+                    <span className="toggle-switch__thumb" />
                   </span>
                 </label>
                 <span style={{ fontSize: '13px', color: theme.text }}>{isEditing ? 'ON' : 'OFF'}</span>
               </div>
 
-              {/* 大きさの編集機能は廃止。円グラフは位置（ドラッグ移動）のみ調整可能 */}
-              {!isMobile && (
-                <section className="op-results__panel-section">
-                  <h3 style={{ color: theme.text }}>円グラフの位置（OK/NG判定割合）</h3>
-                  <p className="op-results__hint" style={{ color: theme.subtext }}>
-                    円グラフ本体をドラッグすると位置を移動できます。
-                  </p>
+              <section className="op-results__panel-section">
+                <h3 style={{ color: theme.text }}>円グラフの位置（OK/NG判定割合）</h3>
+                <button
+                  type="button"
+                  className="op-results__color-reset"
+                  style={{ borderColor: theme.border, color: theme.subtext }}
+                  onClick={handleResetPieLayout}
+                >
+                  位置をリセット
+                </button>
+              </section>
+
+              <section className="op-results__panel-section">
+                <h3 style={{ color: theme.text }}>色（ロボットモニタ）</h3>
+                <div className="op-results__edit-group">
+                  {barItems.map((it) => (
+                    <label key={it.id} className="op-results__color-row">
+                      <span className="op-results__color-row-label" style={{ color: theme.subtext }}>{it.label}</span>
+                      <input className="op-results__color-input" type="color" value={it.color} onChange={(e) => handleColorChange(it.id, e.target.value)} />
+                    </label>
+                  ))}
+                </div>
+              </section>
+
+              <section className="op-results__panel-section">
+                <h3 style={{ color: theme.text }}>色（OK/NG判定割合）</h3>
+                <div className="op-results__edit-group">
+                  {okNgItems.map((it) => (
+                    <label key={it.id} className="op-results__color-row">
+                      <span className="op-results__color-row-label" style={{ color: theme.subtext }}>{it.label}</span>
+                      <input className="op-results__color-input" type="color" value={it.color} onChange={(e) => handleColorChange(it.id, e.target.value)} />
+                    </label>
+                  ))}
                   <button
                     type="button"
                     className="op-results__color-reset"
                     style={{ borderColor: theme.border, color: theme.subtext }}
-                    onClick={handleResetPieLayout}
+                    onClick={handleResetColors}
                   >
-                    位置をリセット
+                    色をリセット
                   </button>
-                </section>
-              )}
-
-              {/* モバイルではグラフ自体を表示していないため、対応する色設定も表示しない */}
-              {!isMobile && (
-                <>
-                  <section className="op-results__panel-section">
-                    <h3 style={{ color: theme.text }}>色（ロボットモニタ）</h3>
-                    <div className="op-results__edit-group">
-                      {barItems.map((it) => (
-                        <label key={it.id} className="op-results__color-row">
-                          <span className="op-results__color-row-label" style={{ color: theme.subtext }}>
-                            {it.label}
-                          </span>
-                          <input type="color"id={`color-${it.id}`} name={`color-${it.id}`}className="op-results__color-input" value={it.color} onChange={(e) => handleColorChange(it.id, e.target.value)} />
-                        </label>
-                      ))}
-                    </div>
-                  </section>
-
-                  <section className="op-results__panel-section">
-                    <h3 style={{ color: theme.text }}>色（OK/NG判定割合）</h3>
-                    <div className="op-results__edit-group">
-                      {okNgItems.map((it) => (
-                        <label key={it.id} className="op-results__color-row">
-                          <span className="op-results__color-row-label" style={{ color: theme.subtext }}>
-                            {it.label}
-                          </span>
-                          <input type="color"id={`okng-color-${it.id}`}name={`okng-color-${it.id}`} className="op-results__color-input" value={it.color} onChange={(e) => handleColorChange(it.id, e.target.value)} />
-                        </label>
-                      ))}
-                      <button
-                        type="button"
-                        className="op-results__color-reset"
-                        style={{ borderColor: theme.border, color: theme.subtext }}
-                        onClick={handleResetColors}
-                      >
-                        色をリセット
-                      </button>
-                    </div>
-                  </section>
-                </>
-              )}
+                </div>
+              </section>
             </div>
           </div>
         )}
-      </div>
 
-      <img src={qrSrc} alt="QRコード" className="op-results__qr" />
+      </div>
     </PanelFrame>
   )
 }

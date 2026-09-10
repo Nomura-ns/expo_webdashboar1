@@ -7,6 +7,18 @@
   gap: 6px;
 }
 
+/* ===== QR避け余白の調整（このページ専用） =====
+   PanelFrame共通のreserveForQrは「右帯＋下帯」を二重に確保する安全設計だが、
+   op-resultsの中身は常に上から下へ積み上がる縦積みレイアウトのため、
+   panel-frame__bodyのpadding-bottomだけで既にQRの高さ帯を丸ごと避けられている
+   （QRは画面右下、bottomからのオフセットの中に完全に収まるため）。
+   右側のpadding-rightは二重の保険にすぎず、QRの真上に来ないバッジ行や
+   フロー図まで幅を無駄に狭めてしまうので、このページに限り打ち消す。
+   PanelFrame.css側の共通定義は変更しない（他ページへの影響を避けるため）。 */
+.op-results.panel-frame--reserve-qr .panel-frame__body {
+  padding-right: 0;
+}
+
 /* ===== 上部：指標バッジ（検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数） ===== */
 
 .op-results__badges {
@@ -98,13 +110,22 @@
 }
 
 .op-results__flow-scroll--overall {
-  max-height: 150px;
+  /* JobFlowDiagram.tsx の OVERALL_SIZING と連動：
+     topPad(24) + maxH(diamondH:108) + bottomPad(24) = 156px が実際のSVG高さ。
+     ここが実高さより小さいと、overflow-y:hiddenでひし形の下側が切れ、
+     さらにこのpanel-frame__bodyの「自然な高さ」計測（scale-inner側）も
+     過小評価されて自動フィットのスケール計算がずれるので、必ずSIZINGの
+     変更に合わせて更新すること。 */
+  max-height: 160px;
   overflow-x: auto;
   overflow-y: hidden;
 }
 
 .op-results__flow-scroll--robot {
-  max-height: 120px;
+  /* JobFlowDiagram.tsx の ROBOT_SIZING と連動：
+     topPad(22) + maxH(diamondH:100) + bottomPad(22) = 144px が実際のSVG高さ。
+     上と同じ理由でSIZING変更時は必ず更新すること。 */
+  max-height: 150px;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -142,8 +163,7 @@
 .op-results__charts-row {
   display: flex;
   gap: 16px;
-  flex: 1;
-  min-height: 0;    /* 固定230pxをやめ、残りスペースに応じて縮小できるようにする */
+  flex: 0 0 260px;
   align-items: stretch;
 }
 
@@ -171,7 +191,7 @@
 }
 
 .op-results__chart-wrap {
-  flex: 0 0 80%;
+  flex: 1 1 0;      /* 凡例の高さを確保した残りだけをグラフ本体に割り当てる */
   min-height: 0;
   display: flex;
   
@@ -182,10 +202,14 @@
   height: 100%;
 }
 
-/* 棒グラフ専用の追加ルール */
+/* 棒グラフ専用の追加ルール
+   ※以前はここに aspect-ratio: 1500/300 を指定して高さを幅から逆算していたが、
+     それだと親(chart-wrap)がflexで伸縮しても高さが追従しなかった。
+     SVG側はviewBox + preserveAspectRatio="xMidYMid meet"で縦横比を保ったまま
+     枠内に収まるよう自動調整されるので、こちら側は単純に flex で
+     使える分だけ伸縮させれば良い。 */
 .op-results__chart-wrap--bar {
   width: 90%;
-  aspect-ratio: 1500 / 300; /* BAR_CHART_W / BAR_CHART_H と一致させる */
 }
 
 .op-results__chart--bar {
@@ -196,6 +220,7 @@
 /* ===== 凡例 ===== */
 
 .op-results__legend {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -225,17 +250,6 @@
   flex-shrink: 0;
 }
 
-/* ===== QRコード ===== */
-
-.op-results__qr {
-  position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-}
-
 /* ===== 編集パネル ===== */
 
 .op-results__body {
@@ -248,16 +262,39 @@
 .op-results__main-col {
   flex: 1;
   min-width: 0;
-  min-height: 0;    /* 同上：これが無いとcharts-rowがどれだけflex:1でも縮められない */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== 自動フィット用ラッパー =====
+   52インチ／55インチ等、モニタごとに実際に使える高さが変わっても
+   スクロールなしで収まるよう、中身全体をtransform: scaleで拡大・縮小する。
+   outer = 実際に使える高さの枠（overflow:hiddenでこれ以上ははみ出させない）
+   inner = 中身本来の高さ。outerとinnerの比率をJS側で計算しscaleに反映する。 */
+.op-results__scale-outer {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.op-results__scale-inner {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  transform-origin: top left;
+  transition: transform 0.15s ease-out, width 0.15s ease-out;
 }
 
 .op-results__edit-panel {
   width: 280px;
   flex-shrink: 0;
-  border-left: 1px solid var(--border-color);
+  border: 1px solid var(--border-soft, #2a3650);
+  border-radius: 6px;
+  box-sizing: border-box;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -267,6 +304,46 @@
   flex: 1;
   overflow-y: auto;
   padding: 16px;
+}
+
+.op-results .toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 40px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.op-results .toggle-switch__input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.op-results .toggle-switch__track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+.op-results .toggle-switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.2s ease;
+}
+
+.op-results .toggle-switch--on .toggle-switch__thumb {
+  transform: translateX(18px);
 }
 
 .op-results__panel-section {
@@ -305,7 +382,7 @@
   width: 32px;
   height: 24px;
   padding: 0;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-soft, #2a3650);
   border-radius: 4px;
   background: transparent;
   cursor: pointer;

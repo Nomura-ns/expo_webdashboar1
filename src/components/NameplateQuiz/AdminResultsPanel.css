@@ -390,6 +390,16 @@
   stroke-width: 1;
 }
 
+.admin-panel__chart-bar-value {
+  font-size: 13px;
+  font-weight: 700;
+  fill: var(--nq-text, #f1f5f9);
+}
+
+.admin-panel__modal--embedded .admin-panel__chart-bar-value {
+  font-size: clamp(13px, 1.3vw, 20px);
+}
+
 /* ---- ロック画面（embedded時のみ）全体のレイアウト ---- */
 .admin-panel__lockview {
   display: flex;

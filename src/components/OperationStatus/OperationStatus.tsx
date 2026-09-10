@@ -28,8 +28,6 @@ export interface RobotStat {
 
 interface OperationStatusProps {
   theme: Theme
-  /** ライト/ダークの判定（QRコード画像の出し分けに使用） */
-  themeMode?: 'light' | 'dark'
   imageUrl?: string
   robotRB1: RobotStat
   robotRB2: RobotStat
@@ -42,15 +40,8 @@ interface OperationStatusProps {
 // しきい値（トルク・速度どちらも同じ%で判定）
 const THRESHOLD = 80
 
-// QRコード画像。ダーク/ライトのテーマに応じて出し分ける（配置予定：/public 直下）
-const QR_CODE_URL = {
-  light: 'QR_light.png',
-  dark: 'QR_dark.png',
-}
-
 export default function OperationStatus({
   theme,
-  themeMode = 'dark',
   robotRB1,
   robotRB2,
   isEditing,
@@ -91,10 +82,8 @@ export default function OperationStatus({
     },
   }))
 
-  const qrUrl = themeMode === 'light' ? QR_CODE_URL.light : QR_CODE_URL.dark
-
   return (
-    <PanelFrame className={`op-status op-status--${theme}`}>
+    <PanelFrame className={`op-status op-status--${theme}`} reserveForQr>
       <div className="axis-monitor">
         <div className="axis-monitor__body">
           <div className="axis-monitor__main-col">
@@ -205,6 +194,29 @@ export default function OperationStatus({
               style={{ background: theme.headerBg, borderColor: theme.border }}
             >
               <div className="axis-monitor__edit-panel-scroll">
+                {/* 編集モードのON/OFFはこのパネル先頭のトグルで切り替える（他ページと統一） */}
+                <label className="axis-monitor__panel-toggle-row" style={{ color: theme.text }}>
+                  <span>編集モード</span>
+                  <span className={`toggle-switch${isEditing ? ' toggle-switch--on' : ''}`}>
+                    <input
+                      type="checkbox"
+                      className="toggle-switch__input"
+                      checked={isEditing}
+                      onChange={(e) => onEditingChange(e.target.checked)}
+                      aria-label="編集モードの切替"
+                    />
+                    <span
+                      className="toggle-switch__track"
+                      style={{ background: isEditing ? theme.accent : theme.border }}
+                    >
+                      <span className="toggle-switch__thumb" />
+                    </span>
+                  </span>
+                  <span className="axis-monitor__panel-toggle-state" style={{ color: theme.subtext }}>
+                    {isEditing ? 'ON' : 'OFF'}
+                  </span>
+                </label>
+
                 <section className="axis-monitor__panel-section">
                   <h3 style={{ color: theme.text }}>ロボットカラー</h3>
                   <div className="axis-monitor__edit-group">
@@ -262,21 +274,10 @@ export default function OperationStatus({
                     </button>
                   </div>
                 </section>
-
-                <button
-                  type="button"
-                  className="axis-monitor__panel-reset"
-                  style={{ borderColor: theme.border, color: theme.subtext }}
-                  onClick={() => onEditingChange(false)}
-                >
-                  編集モードを終了
-                </button>
               </div>
             </div>
           )}
         </div>
-
-        <img src={qrUrl} alt="QRコード" className="axis-monitor__qr" />
       </div>
     </PanelFrame>
   )

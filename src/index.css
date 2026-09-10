@@ -67,10 +67,52 @@ html, body {
   min-width: 0;
 }
 
+/* --- QRコード（dashboard/control/anomalyの3画面共通。1箇所だけ定義） ---
+   position: fixed にすることで、コンテンツの高さやモニタサイズに関係なく
+   常にビューポートの右下に固定表示される（absoluteだと親要素の高さが
+   ビューポートより大きい/小さい場合にズレる可能性があった）。
+   サイズ・余白は --qr-size / --qr-gap で一元管理し、PanelFrame側の
+   避け用余白（--qr-safe-inset）もここから算出する。 */
+.app-qr {
+  position: fixed;
+  right: var(--qr-gap);
+  /* footerの実高さ(--footer-h)ぶん底上げしてfooterの上に重ならないようにする */
+  bottom: calc(var(--footer-h) + var(--qr-gap));
+  width: var(--qr-size);
+  height: var(--qr-size);
+  object-fit: contain;
+  z-index: 10;
+  pointer-events: none; /* パネルの操作要素と重なっても操作を邪魔しない */
+}
+
+/* --- アイドル通知バナー（30分操作なしで接続停止中に表示） --- */
+.app-idle-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 90;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
 /* --- ダッシュボード共通レイアウト --- */
 :root {
   /* パネル全体を右にずらす量。ここだけ触れば全ページに反映される */
   --panel-offset-x: 0px;
+
+  /* --- QRコード関連（.app-qr と PanelFrame の避け余白で共有） --- */
+  --qr-size: 72px;   /* QR画像の一辺 */
+  --qr-gap: 4px;     /* footer上端／画面端からの余白 */
+  /* footerの実高さ。App.tsx側でResizeObserverにより実測値へ上書きされる。
+     JS実行前・footer非表示時（モバイル）のフォールバックとして0を入れておく。 */
+  --footer-h: 0px;
+  /* PanelFrame側がQRを避けるために確保する安全余白
+     （footerの高さ＋QR本体＋余白＋視認用の少し余分） */
+  --qr-safe-inset: calc(var(--footer-h) + var(--qr-size) + var(--qr-gap) + 8px);
 }
 /* 高さは flex:1 でヘッダーの実高さ(--header-h)に追従させる方式を正とする */
 .dashboard-page {
@@ -132,5 +174,23 @@ html, body {
 
   .app-footer {
     display: none !important;
+  }
+
+  .app-qr {
+    display: none; /* モバイル版ではQRコードは非表示 */
+  }
+
+  /* QRを表示しないので、PanelFrame側の避け余白も不要にする */
+  :root {
+    --qr-safe-inset: 0px;
+  }
+
+  .app-idle-banner {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
+    text-align: center;
+    white-space: normal;
   }
 }

@@ -36,19 +36,6 @@
   min-height: 0;    /* 同上、省略可 */
 }
 
-.panel-frame__rivet {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #4a5761, #1c2429 70%);
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.5);
-}
-.panel-frame__rivet--tl { top: 9px; left: 9px; }
-.panel-frame__rivet--tr { top: 9px; right: 9px; }
-.panel-frame__rivet--bl { bottom: 9px; left: 9px; }
-.panel-frame__rivet--br { bottom: 9px; right: 9px; }
-
 .panel-frame__header {
   display: flex;
   align-items: baseline;
@@ -121,4 +108,30 @@
   display: flex;
   flex-direction: column;
   z-index: 1;
+}
+
+/* ===== QR避け（reserveForQr propがtrueのPanelFrameにのみ付与） =====
+   画面右下に固定表示されるQR(.app-qr)と重なる可能性があるパネルに
+   このクラスを付けると、
+   1) パネル自体の右下を実際に四角く切り欠く（clip-path）ことで、
+      QRの下にパネルの背景・枠線・角丸が残って「重なって見える」状態を無くす
+   2) panel-frame__body側にも同サイズの余白を確保し、中身（グラフ等）が
+      QRの位置に描画されないようにする
+   サイズは index.css の --qr-safe-inset と連動しているため、
+   QRのサイズ・余白・footerの高さを変えてもここを個別に調整する必要はない。 */
+.panel-frame--reserve-qr {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--qr-safe-inset, 0px)),
+    calc(100% - var(--qr-safe-inset, 0px)) calc(100% - var(--qr-safe-inset, 0px)),
+    calc(100% - var(--qr-safe-inset, 0px)) 100%,
+    0 100%
+  );
+}
+
+.panel-frame--reserve-qr .panel-frame__body {
+  padding-right: var(--qr-safe-inset, 0px);
+  padding-bottom: var(--qr-safe-inset, 0px);
+  box-sizing: border-box;
 }

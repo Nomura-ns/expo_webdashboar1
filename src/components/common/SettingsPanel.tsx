@@ -8,6 +8,7 @@ type Props = {
   isPlaying: boolean
   isEditing: boolean
   isNameplatePage: boolean       // 追加：銘板ページを開いているか
+  isEditingEnabled: boolean
   onThemeChange: (key: ThemeKey) => void
   onPlayingChange: (value: boolean) => void
   onEditingChange: (value: boolean) => void
@@ -15,7 +16,7 @@ type Props = {
 }
 
 export default function SettingsPanel({
-  theme, themeKey, isEditing, isNameplatePage,
+  theme, themeKey, isEditing, isNameplatePage, isEditingEnabled,
   onThemeChange, onEditingChange, onOpenAdmin,
 }: Props) {
   const isMobile = useIsMobile() 
@@ -62,7 +63,7 @@ export default function SettingsPanel({
             🔒
           </button>
         </div>
-      ) : (
+      ) : isEditingEnabled ? (
         /* 編集モード切替スイッチ（銘板ページ以外） */
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px' }}>
           <span style={{ width: '80px', fontSize: '16px', color: theme.text }}>編集モード</span>
@@ -116,13 +117,17 @@ export default function SettingsPanel({
             
           </span>
         </div>
-      )}
+      ) : null}
 
       {/* テーマ */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: isMobile ? '8px' : '16px' }}>
         <span style={{ width: '80px', fontSize: '13px', color: theme.text, paddingTop: '4px' }}>テーマ</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {(Object.keys(THEMES) as ThemeKey[]).map(key => (
+          {/* dark-red / light-red はカメラ監視パネルの異常表示色と紛らわしいため、
+             テーマ選択肢からは除外する（定義自体はthemes.tsに残す） */}
+          {(Object.keys(THEMES) as ThemeKey[])
+            .filter((key) => key !== 'dark-red' && key !== 'light-red')
+            .map(key => (
             <button key={key} onClick={() => onThemeChange(key)} style={{
               padding: '4px 12px', borderRadius: '6px', fontSize: '12px',
               border: `1px solid ${themeKey === key ? theme.accent : theme.border}`,

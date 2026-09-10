@@ -8,18 +8,12 @@ import './RobotArmDashboard.css'
 
 type Props = {
   theme: Theme
-  themeMode?: 'light' | 'dark'
   isEditing: boolean
   onEditingChange: (value: boolean) => void
 }
 
-const QR_CODE_URL = {
-  light: 'QR_light.png',
-  dark: 'QR_dark.png',
-}
-
 // 背景色（theme.bg）が明るい色かどうかを簡易判定
-// テーマの明暗に応じて、キャンバス背景・QRコード画像・異常時の色を切り替えるために使う
+// テーマの明暗に応じて、キャンバス背景・異常時の色を切り替えるために使う
 function isLightColor(hex: string): boolean {
   const c = hex.replace('#', '')
   if (c.length !== 6) return true
@@ -83,7 +77,7 @@ const nextCameraDefaults = (index: number): CameraFeed => ({
   totalSteps: 5,
 })
 
-export default function RobotArmDashboard({ theme,  themeMode = 'dark',isEditing, onEditingChange }: Props) {
+export default function RobotArmDashboard({ theme, isEditing, onEditingChange }: Props) {
   const isMobile = useIsMobile()
   const mobileScrollerRef = useRef<HTMLDivElement>(null)
 
@@ -123,7 +117,6 @@ export default function RobotArmDashboard({ theme,  themeMode = 'dark',isEditing
 
   const canvasBg = isLightColor(theme.bg) ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.14)'
   const abnormalColor = isLightColor(theme.bg) ? ABNORMAL_COLOR_LIGHT : ABNORMAL_COLOR_DARK
-  const qrUrl = themeMode === 'light' ? QR_CODE_URL.light : QR_CODE_URL.dark
 
   const abnormalCameras = cameras.filter(cam => cam.status === '異常')
   const singleAbnormalCamera = abnormalCameras.length === 1 ? abnormalCameras[0] : null
@@ -308,7 +301,7 @@ export default function RobotArmDashboard({ theme,  themeMode = 'dark',isEditing
   }
 
   return (
-    <PanelFrame className="robot-dashboard">
+    <PanelFrame className="robot-dashboard" reserveForQr>
       <div
         className={`robot-dashboard__body${isEditing ? ' is-editing' : ''}`}
         style={{ '--canvas-bg': canvasBg, '--abnormal-color': abnormalColor } as React.CSSProperties}
@@ -481,8 +474,6 @@ export default function RobotArmDashboard({ theme,  themeMode = 'dark',isEditing
                   )}
                 </>
               )}
-
-              <img src={qrUrl} alt="QRコード" className="robot-dashboard__qr" />
             </div>
           </div>
         )}

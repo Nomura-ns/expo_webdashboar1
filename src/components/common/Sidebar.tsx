@@ -154,37 +154,29 @@ function DashboardPreview({ theme }: { theme: Theme }) {
 }
 
 function ControlPreview({ theme }: { theme: Theme }) {
-  // 実ページの「ジョブ実行回数」バーチャートを模したミニプレビュー
-  const colors = [
-    '#22d3d3', // ピック/格納
-    '#3fa9f5', // 挿入・勘合
-    '#7fb8e8', // 位置決め
-    '#f2b544', // ネジ締め
-    '#f2735a', // ネジ緩め
-    '#7ec97e', // 検査
-    '#9ad07a', // 仕分け
-    '#ef5a5a', // 蓋開閉
-    '#b467e0', // 刃交換
-    '#3fbfa0', // リング着脱
+  // 実ページ（ROBOT PERFORMANCE）のミニ版：
+  // 上部の指標バッジ／全体フロー図／OK・NGドーナツ＋ロボットモニタ棒グラフ、で構成する。
+  // 高さは全て固定pxにし、NAMEPLATEプレビューで起きたスケール不安定化を再発させない。
+  const badges = [
+    { label: '検査回数', value: 150 },
+    { label: '異常回数', value: 4 },
+    { label: '上刃挿入', value: 118 },
   ]
 
-  // 日別グループ（各グループ内は上記カラー順、高さはランダム風に固定値）
-  const days = [
-    [12, 10, 9, 7, 6, 6, 6, 5, 3, 3],
-    [15, 12, 11, 9, 8, 7, 6, 6, 4, 4],
-    [9, 8, 7, 10, 7, 6, 6, 5, 3, 3],
-    [18, 17, 15, 10, 9, 8, 6, 6, 4, 4],
-    [13, 12, 11, 14, 10, 9, 9, 8, 5, 5],
-  ]
+  const flow = ['刃物取付', 'インターバル', '刃物取外', '検査']
 
-  const max = 18
-  const groupGap = 3
-  const barGap = 0.4
-  const barsPerGroup = colors.length
-  const groupWidth = (90 - groupGap * (days.length - 1)) / days.length
-  const barWidth = (groupWidth - barGap * (barsPerGroup - 1)) / barsPerGroup
-  const chartH = 52
-  const chartTop = 6
+  const okPct = 97
+  const radius = 12
+  const c = 2 * Math.PI * radius
+  const offset = c - (okPct / 100) * c
+
+  const monitorBars = [
+    { color: '#3fa9f5', h: 100 }, // 検査回数
+    { color: '#ef5a5a', h: 3 },   // 異常回数
+    { color: '#f2b544', h: 79 },  // 上刃挿入回数
+    { color: '#4fbf8f', h: 100 }, // ねじ締め回数
+    { color: '#b48be0', h: 97 },  // ねじ緩め回数
+  ]
 
   return (
     <div style={{ padding: '8px' }}>
@@ -193,138 +185,106 @@ function ControlPreview({ theme }: { theme: Theme }) {
         border: `1px solid ${theme.border}`,
         borderRadius: '6px',
         padding: '6px',
-        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
       }}>
-        {/* 凡例（先頭数個のみ・省略気味に） */}
-        <div style={{
-          fontSize: '6px',
-          color: theme.subtext,
-          marginBottom: '4px',
-          display: 'flex',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '3px',
-        }}>
-          {colors.slice(0, 4).map((c, i) => (
-            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-              <span style={{
-                width: '4px', height: '4px', borderRadius: '50%',
-                background: c, display: 'inline-block',
-              }} />
-            </span>
+        {/* 指標バッジ */}
+        <div style={{ display: 'flex', gap: '3px' }}>
+          {badges.map((b, i) => (
+            <div key={i} style={{
+              flex: 1, minWidth: 0,
+              border: `1px solid ${theme.border}`, borderRadius: '3px',
+              padding: '2px 3px',
+            }}>
+              <div style={{
+                fontSize: '4px', color: theme.subtext,
+                whiteSpace: 'nowrap', overflow: 'hidden',
+              }}>
+                {b.label}
+              </div>
+              <div style={{ fontSize: '6px', fontWeight: 700, color: '#e8ecf3' }}>
+                {b.value}
+              </div>
+            </div>
           ))}
-          <span style={{ fontSize: '6px', color: theme.subtext }}>ジョブ実行回数</span>
         </div>
 
-        <svg width="100%" height="64" viewBox="0 0 90 64" preserveAspectRatio="none">
-          <rect x="0" y="0" width="90" height="64" fill="#141a2b" />
-
-          {/* 横グリッド線 */}
-          {[0, 1, 2].map(i => (
-            <line
-              key={i}
-              x1="0" x2="90"
-              y1={chartTop + (chartH / 3) * i}
-              y2={chartTop + (chartH / 3) * i}
-              stroke={theme.border}
-              strokeWidth="0.3"
-              opacity="0.5"
-            />
+        {/* 全体フロー */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1px', height: '12px' }}>
+          {flow.map((f, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1px', flex: 1, minWidth: 0 }}>
+              <div style={{
+                flex: 1, height: '100%',
+                border: `1px solid ${theme.accent}`, borderRadius: '2px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '4px', color: theme.accent,
+                whiteSpace: 'nowrap', overflow: 'hidden',
+              }}>
+                {f}
+              </div>
+              {i < flow.length - 1 && (
+                <span style={{ fontSize: '5px', color: theme.subtext, flexShrink: 0, lineHeight: 1 }}>
+                  ›
+                </span>
+              )}
+            </div>
           ))}
+        </div>
 
-          {/* バー本体 */}
-          {days.map((group, gi) => {
-            const groupX = gi * (groupWidth + groupGap)
-            return (
-              <g key={gi}>
-                {group.map((val, bi) => {
-                  const h = (val / max) * chartH
-                  const x = groupX + bi * (barWidth + barGap)
-                  const y = chartTop + chartH - h
-                  return (
-                    <rect
-                      key={bi}
-                      x={x}
-                      y={y}
-                      width={barWidth}
-                      height={h}
-                      fill={colors[bi]}
-                      rx="0.3"
-                    />
-                  )
-                })}
-                {/* 日付ラベル */}
-                <text
-                  x={groupX + groupWidth / 2}
-                  y={62}
-                  fontSize="4.2"
-                  fill={theme.subtext}
-                  textAnchor="middle"
-                >
-                  {`0${7}/2${gi + 4}`}
-                </text>
-              </g>
-            )
-          })}
-        </svg>
+        {/* OK/NGドーナツ＋ロボットモニタ棒グラフ */}
+        <div style={{ display: 'flex', gap: '5px', alignItems: 'center', height: '26px' }}>
+          <svg width="26" height="26" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+            <circle cx="16" cy="16" r={radius} fill="none" stroke={theme.border} strokeWidth="5" />
+            <circle
+              cx="16" cy="16" r={radius} fill="none" stroke="#3fa9f5" strokeWidth="5"
+              strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+              transform="rotate(-90 16 16)"
+            />
+          </svg>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', gap: '2px', height: '20px' }}>
+            {monitorBars.map((m, i) => (
+              <div key={i} style={{
+                flex: 1, height: `${m.h}%`,
+                background: m.color, borderRadius: '1px 1px 0 0',
+              }} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
 function AlertPreview({ theme }: { theme: Theme }) {
-  const cycleTime = { value: 4.4, unit: '秒' }
+  // 実ページ（軸モニタ ー RB1/RB2比較）のミニ版：
+  // RB1/RB2稼働率ドーナツ＋軸ごとに中央から左右へ伸びるトルクバー、で構成する。
+  // 高さは全て固定pxにし、NAMEPLATEプレビューで起きた「自然サイズが
+  // 揺れてPreviewThumbのスケールが安定しない」問題を再発させないようにしている。
+  const RB1_COLOR = '#3fa9f5'
+  const RB2_COLOR = '#f2a33f'
+  const rb1Util = 92
+  const rb2Util = 88
 
-  const robots = [
-    {
-      label: 'A',
-      top: { axis: 'A-6', speed: 79, torque: 54 },
-      bottom: { axis: 'A-1', speed: 78, torque: 53 },
-    },
-    {
-      label: 'B',
-      top: { axis: 'B-6', speed: 83, torque: 56 },
-      bottom: { axis: 'B-1', speed: 82, torque: 55 },
-    },
+  const axes = [
+    { label: '軸1', rb1: 55, rb2: 53 },
+    { label: '軸2', rb1: 50, rb2: 48 },
+    { label: '軸3', rb1: 57, rb2: 55 },
   ]
 
-  // 簡易アームアイコン（DashboardPreviewのロボットアームを流用・簡略化）
-  function MiniArm() {
+  function Donut({ pct, color }: { pct: number; color: string }) {
+    const r = 12
+    const c = 2 * Math.PI * r
+    const offset = c - (pct / 100) * c
     return (
-      <svg width="100%" height="100%" viewBox="0 0 60 60" preserveAspectRatio="xMidYMid meet">
-        <rect x="0" y="0" width="60" height="60" rx="4" fill="#e9edf1" />
-        <g fill="none" stroke="#8a97a6" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="24" y="42" width="12" height="4" rx="1" fill="#8a97a6" stroke="none" />
-          <line x1="30" y1="42" x2="30" y2="34" />
-          <line x1="30" y1="34" x2="40" y2="27" />
-          <line x1="40" y1="27" x2="37" y2="18" />
-          <line x1="37" y1="18" x2="33" y2="14" />
-        </g>
-        <g fill={theme.accent}>
-          <circle cx="30" cy="34" r="1.6" />
-          <circle cx="40" cy="27" r="1.4" />
-          <circle cx="37" cy="18" r="1.2" />
-        </g>
+      <svg width="26" height="26" viewBox="0 0 32 32">
+        <circle cx="16" cy="16" r={r} fill="none" stroke={theme.border} strokeWidth="4" />
+        <circle
+          cx="16" cy="16" r={r} fill="none" stroke={color} strokeWidth="4"
+          strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+          transform="rotate(-90 16 16)"
+        />
       </svg>
-    )
-  }
-
-  function StatBadge({ axis, speed, torque }: { axis: string; speed: number; torque: number }) {
-    return (
-      <div style={{
-        background: theme.surface,
-        border: `1px solid ${theme.border}`,
-        borderRadius: '4px',
-        padding: '2px 4px',
-        display: 'flex',
-        alignItems: 'baseline',
-        gap: '3px',
-        whiteSpace: 'nowrap',
-      }}>
-        <span style={{ fontSize: '6px', color: theme.text, fontWeight: 700 }}>{axis}</span>
-        <span style={{ fontSize: '7px', color: '#3fb6ff', fontWeight: 700 }}>{speed}</span>
-        <span style={{ fontSize: '7px', color: '#ffb648', fontWeight: 700 }}>{torque}%</span>
-      </div>
     )
   }
 
@@ -332,35 +292,50 @@ function AlertPreview({ theme }: { theme: Theme }) {
     <div style={{ padding: '8px' }}>
       <div style={{
         background: theme.bg, border: `1px solid ${theme.border}`,
-        borderRadius: '6px', padding: '8px', display: 'flex',
-        flexDirection: 'column', gap: '6px',
+        borderRadius: '6px', padding: '6px', display: 'flex',
+        flexDirection: 'column', gap: '5px',
       }}>
-        {/* サイクルタイム */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-          <span style={{ fontSize: '7px', color: theme.subtext, fontWeight: 600 }}>
-            サイクルタイム
-          </span>
-          <span style={{ fontSize: '10px', fontWeight: 700, color: '#4ade80' }}>
-            {cycleTime.value}
-          </span>
-          <span style={{ fontSize: '6px', color: theme.subtext }}>{cycleTime.unit}</span>
+        {/* タイトル */}
+        <div style={{ fontSize: '7px', color: theme.subtext, textAlign: 'center' }}>
+          軸モニタ ー RB1/RB2比較
         </div>
 
-        {/* ロボットA・B 速度/トルク */}
-        <div style={{ display: 'flex', gap: '6px' }}>
-          {robots.map((r, i) => (
-            <div key={i} style={{
-              flex: 1, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', gap: '2px',
-            }}>
-              <div style={{ fontSize: '6px', color: theme.subtext, alignSelf: 'flex-start' }}>
-                ロボット{r.label}
+        {/* RB1/RB2 稼働率ドーナツ */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <Donut pct={rb1Util} color={RB1_COLOR} />
+            <span style={{ fontSize: '6px', fontWeight: 700, color: RB1_COLOR, whiteSpace: 'nowrap' }}>
+              RB1 {rb1Util}%
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+            <Donut pct={rb2Util} color={RB2_COLOR} />
+            <span style={{ fontSize: '6px', fontWeight: 700, color: RB2_COLOR, whiteSpace: 'nowrap' }}>
+              RB2 {rb2Util}%
+            </span>
+          </div>
+        </div>
+
+        {/* 軸ごとのトルクバー（中央の軸ラベルから左＝RB1／右＝RB2へ伸びる） */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          {axes.map((a, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px', height: '9px' }}>
+              <div style={{ flex: 1, height: '6px', display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{
+                  width: `${a.rb1}%`, background: RB1_COLOR, borderRadius: '2px 0 0 2px', height: '100%',
+                }} />
               </div>
-              <StatBadge axis={r.top.axis} speed={r.top.speed} torque={r.top.torque} />
-              <div style={{ width: '28px', height: '28px' }}>
-                <MiniArm />
+              <span style={{
+                fontSize: '5px', color: theme.subtext, width: '13px',
+                textAlign: 'center', flexShrink: 0, whiteSpace: 'nowrap',
+              }}>
+                {a.label}
+              </span>
+              <div style={{ flex: 1, height: '6px' }}>
+                <div style={{
+                  width: `${a.rb2}%`, background: RB2_COLOR, borderRadius: '0 2px 2px 0', height: '100%',
+                }} />
               </div>
-              <StatBadge axis={r.bottom.axis} speed={r.bottom.speed} torque={r.bottom.torque} />
             </div>
           ))}
         </div>
@@ -369,151 +344,146 @@ function AlertPreview({ theme }: { theme: Theme }) {
   )
 }
 
+
 function NameplateQuizPreview({ theme }: { theme: Theme }) {
-  // 実際の「正解集計ページ」に合わせたミニプレビュー
-  // 大きな数値＋リングゲージ（左） + フィルターボタン／日付チェックボックス（右上） + 日別棒グラフ（下）
-  const accuracy = 82 // 全体正解率(%)
-
-  const filters = ['全体', '運転起動', '停止', 'エラーリセット', 'カウンタリセット']
-  const activeFilter = '運転起動'
-
-  const days = [
-    { date: '08/22', pct: null },
-    { date: '08/23', pct: null },
-    { date: '08/24', pct: 100 },
-    { date: '08/25', pct: 100 },
-    { date: '08/26', pct: null },
-  ]
-
-  const radius = 15
+  // 実ページ（NAME PANEL）のミニ版：
+  // 左：正解率のリングゲージ／右：スマホでクイズに挑戦しようのQR案内／下：正解率推移の棒グラフ
+  // 高さは全て固定pxにし、以前の可変高さ(minHeight)で起きたスケール不安定化を再発させない。
+  const accuracy = 80
+  const radius = 14
   const circumference = 2 * Math.PI * radius
   const offset = circumference - (accuracy / 100) * circumference
 
-  const barMaxH = 22 // px
+  // 実ページ同様、直近以外はまだ実績が無い（0）想定のスパースな棒グラフ
+  const days = [100, 100, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  const barColors = ['#c7ccd6', '#ef7a7a']
+
+  // QRコード風の簡易パターン（実データではなく見た目のみのモック）
+  const qrCells = [
+    1, 0, 1, 1, 0, 1,
+    0, 1, 1, 1, 0, 1,
+    1, 0, 0, 1, 1, 0,
+    1, 1, 1, 0, 1, 1,
+    0, 0, 1, 1, 0, 1,
+    1, 1, 0, 1, 1, 0,
+  ]
 
   return (
     <div style={{ padding: '8px' }}>
-      <div style={{
-        background: theme.bg, border: `1px solid ${theme.border}`,
-        borderRadius: '6px', padding: '8px', display: 'flex',
-        flexDirection: 'column', gap: '6px',
-      }}>
-        <div style={{ fontSize: '8px', color: theme.subtext }}>
-          <span style={{ color: theme.accent, marginRight: '4px' }}>銘板</span>
-          正解集計
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {/* 左：大きい数値＋リング */}
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: '2px', flexShrink: 0, width: '46px',
-          }}>
-            <div style={{ position: 'relative', width: '32px', height: '32px' }}>
-              <svg width="32" height="32" viewBox="0 0 40 40" style={{ transform: 'rotate(-90deg)' }}>
-                <circle cx="20" cy="20" r={radius} fill="none" stroke={theme.border} strokeWidth="4" />
-                <circle
-                  cx="20" cy="20" r={radius}
-                  fill="none" stroke={theme.accent} strokeWidth="4"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={offset}
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <span style={{
-              fontSize: '13px', fontWeight: 700, color: theme.accent, lineHeight: 1, marginTop: '2px',
-            }}>
+      <div
+        style={{
+          background: theme.bg,
+          border: `1px solid ${theme.border}`,
+          borderRadius: '6px',
+          padding: '6px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '5px',
+        }}
+      >
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', height: '34px' }}>
+          {/* 正解率リングゲージ */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              width: '32px',
+              height: '34px',
+            }}
+          >
+            <svg width="30" height="30" viewBox="0 0 36 36" style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx="18" cy="18" r={radius} fill="none" stroke={theme.border} strokeWidth="4" />
+              <circle
+                cx="18" cy="18" r={radius} fill="none" stroke={theme.accent} strokeWidth="4"
+                strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+              />
+            </svg>
+            <span style={{ fontSize: '8px', fontWeight: 700, color: theme.accent, lineHeight: 1, marginTop: '1px' }}>
               {accuracy}
             </span>
-            <span style={{ fontSize: '5px', color: theme.subtext, whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '4px', color: theme.subtext, whiteSpace: 'nowrap' }}>
               % 正解率
             </span>
           </div>
 
-          {/* 右：フィルターボタン＋日付チェックボックス＋日別棒グラフ */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0 }}>
-            {/* フィルターボタン */}
-            <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap' }}>
-              {filters.map((f, i) => (
-                <span key={i} style={{
-                  fontSize: '4.5px', color: f === activeFilter ? theme.accent : theme.subtext,
-                  border: `1px solid ${f === activeFilter ? theme.accent : theme.border}`,
-                  borderRadius: '6px', padding: '1px 4px', whiteSpace: 'nowrap',
-                }}>
-                  {f}
-                </span>
+          {/* スマホでクイズに挑戦しよう（QR案内） */}
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: '100%',
+              border: `1px solid ${theme.border}`,
+              borderRadius: '4px',
+              padding: '3px 4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: '5px', color: theme.text, fontWeight: 600,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}
+              >
+                スマホでクイズに挑戦しよう
+              </div>
+              <div style={{ fontSize: '4px', color: theme.subtext, marginTop: '1px' }}>
+                全部で4問
+              </div>
+            </div>
+            <div
+              style={{
+                width: '20px', height: '20px', flexShrink: 0,
+                background: '#fff', borderRadius: '2px', padding: '2px',
+                display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5px',
+              }}
+            >
+              {qrCells.map((v, i) => (
+                <span key={i} style={{ background: v ? '#111' : 'transparent' }} />
               ))}
             </div>
+          </div>
+        </div>
 
-            {/* 日付チェックボックス */}
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-              {days.map((d, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1.5px' }}>
-                  <div style={{
-                    width: '5px', height: '5px', borderRadius: '1px',
-                    background: theme.accent, border: `1px solid ${theme.accent}`,
-                  }} />
-                  <span style={{ fontSize: '4.5px', color: theme.text, whiteSpace: 'nowrap' }}>
-                    {d.date}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* 日別棒グラフ */}
-            <div style={{
-              background: theme.surface, border: `1px solid ${theme.border}`,
-              borderRadius: '4px', padding: '4px 6px',
-            }}>
-              <div style={{ fontSize: '5px', color: theme.subtext, marginBottom: '2px' }}>
-                日別正解率
-              </div>
-              <div style={{
-                display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-                height: `${barMaxH}px`, gap: '3px', borderBottom: `1px solid ${theme.border}`,
-                paddingBottom: '2px',
-              }}>
-                {days.map((d, i) => (
-                  <div key={i} style={{
-                    flex: 1, display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'flex-end', height: '100%',
-                  }}>
-                    <span style={{ fontSize: '4px', color: theme.text, marginBottom: '1px' }}>
-                      {d.pct === null ? '-' : `${d.pct}%`}
-                    </span>
-                    {d.pct !== null && (
-                      <div style={{
-                        width: '60%',
-                        height: `${(d.pct / 100) * (barMaxH - 8)}px`,
-                        background: theme.accent,
-                        borderRadius: '1px',
-                      }} />
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div style={{
-                display: 'flex', justifyContent: 'space-between', marginTop: '2px',
-              }}>
-                {days.map((d, i) => (
-                  <span key={i} style={{
-                    fontSize: '4px', color: theme.subtext, flex: 1, textAlign: 'center',
-                  }}>
-                    {d.date}
-                  </span>
-                ))}
-              </div>
-            </div>
+        {/* 正解率推移（日別棒グラフ） */}
+        <div
+          style={{
+            border: `1px solid ${theme.border}`,
+            borderRadius: '4px',
+            padding: '4px 5px',
+          }}
+        >
+          <div style={{ fontSize: '5px', color: theme.subtext, marginBottom: '2px' }}>
+            正解率推移
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '1px', height: '18px' }}>
+            {days.map((v, i) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  height: v ? '100%' : '2px',
+                  background: v ? barColors[i % barColors.length] : theme.border,
+                  borderRadius: '1px',
+                }}
+              />
+            ))}
           </div>
         </div>
       </div>
     </div>
   )
 }
+
+
 // スライドパネルの幅。ブックマークタブの水平位置もこの値を基準に計算するため、
 // ここを変えれば両方が連動して動く。
-const SIDEBAR_WIDTH = 280
+const SIDEBAR_WIDTH = 270
 
 type Props = {
   theme: Theme
@@ -587,7 +557,7 @@ export default function Sidebar({
                 fontSize: '11px',
                 fontWeight: isActive ? 'bold' : 'normal',
               }}>
-                {page.label}
+                {page.key === 'control' ? 'ROBOT PERM' : page.label}
               </span>
             </button>
           )

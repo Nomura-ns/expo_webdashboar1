@@ -317,24 +317,15 @@
   height: 100%;
 }
 
-/* --- QRコード（モニター領域右下固定） --- */
-.robot-dashboard__qr {
-position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-}
-
 /* --- 編集パネル（右側固定） --- */
 .robot-dashboard__edit-panel {
-  flex: 0 0 300px;
-  width: 300px;
+  flex: 0 0 280px;
+  width: 280px;
   height: 100%;
   margin-left: 12px;
   border: 1px solid;
-  border-radius: 12px;
+  border-radius: 6px;
+  box-sizing: border-box;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -597,6 +588,27 @@ position: absolute;
 .robot-dashboard__mobile-status-info-item .is-abnormal {
   color: #ff6b6b;
   font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .robot-dashboard__body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .robot-dashboard__edit-panel {
+    flex: 0 0 auto;
+    width: 100%;
+    height: auto;
+    max-height: 45vh;
+    margin: 12px 0 0;
+  }
+
+  .robot-dashboard__mobile-wrap {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+  }
 }
 
 /* 横スクロールで1台ずつ切替（スナップ）。表示は常に1台のみ */

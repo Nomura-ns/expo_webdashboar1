@@ -9,38 +9,13 @@ import RobotArmDashboard from './components/RobotArmDashboard/RobotArmDashboard'
 import OperationStatus from './components/OperationStatus/OperationStatus'
 import NameplateQuiz from './components/NameplateQuiz/NameplateQuiz'
 import { usePlcWebSocket } from './hooks/usePlcWebSocket' 
+import { useIsMobile } from './hooks/useMediaQuery'
 import { usePlcJobFlowSignals, JOB_FLOW_STEP_ADDRESS, JOB_FLOW_CYCLE_CURRENT_ADDRESS, JOB_FLOW_CYCLE_TOTAL_ADDRESS,} from './hooks/usePlcJobFlowSignals'
 import { usePlcRobotStatusSignals } from './hooks/usePlcRobotStatusSignals'
 import { usePlcOperationMetricsSignals } from './hooks/usePlcOperationMetricsSignals'
 import { OPERATION_METRICS_ADDRESSES } from './config/operationMetricsAddresses'
+import { getRecentDates, METRIC_DAYS } from './utils/dateRange'
 
-// ※ config/jobDefinitions.ts は使用しません（稼働実績は検査回数・異常回数・
-//   上刃挿入回数・ねじ締め回数・ねじ緩め回数・検査OK/NGの指標に統一したため）。
-
-// サンプルデータ（実際はAPIやPLCから取得。当日分＝配列末尾はPLCの値があればそちらを優先）
-const DATES = [ '07/26', '07/27', '07/28']
-
-// 稼働実績5指標＋検査OK/NGのサンプルデータ（ダミー値）
-const SAMPLE_METRICS: Record<Exclude<keyof MetricPoint, 'date'>, number[]> = {
-  inspectCount:  [ 150, 150, 150],
-  anomalyCount:  [ 12, 6, 4],
-  insertCount:   [ 96, 145, 118],
-  tightenCount:  [ 150, 150, 150],
-  loosenCount:   [ 152, 140, 145],
-  okCount:       [ 96, 145, 151],
-  ngCount:       [ 7, 4, 2],
-}
-
-const sampleMetrics: MetricPoint[] = DATES.map((date, i) => ({
-  date,
-  inspectCount: SAMPLE_METRICS.inspectCount[i] ?? 0,
-  anomalyCount: SAMPLE_METRICS.anomalyCount[i] ?? 0,
-  insertCount: SAMPLE_METRICS.insertCount[i] ?? 0,
-  tightenCount: SAMPLE_METRICS.tightenCount[i] ?? 0,
-  loosenCount: SAMPLE_METRICS.loosenCount[i] ?? 0,
-  okCount: SAMPLE_METRICS.okCount[i] ?? 0,
-  ngCount: SAMPLE_METRICS.ngCount[i] ?? 0,
-}))
 
 // 稼働状況（anomalyページ）用のサンプルデータ
 // RB1・RB2は同一機種のため、画像は1枚を共通で使用する
@@ -153,6 +128,9 @@ function getInitialPage(): PageKey {
   return 'dashboard'
 }
 
+// アイドル検知：この時間ユーザー操作が無ければPLC接続を切る（Netlify無料枠の閲覧数上限対策）
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000 // 30分
+
 export default function App() {
   const isTouchDevice = !window.matchMedia('(hover: hover)').matches
   const [isGearHover, setIsGearHover] = useState(false)
@@ -167,10 +145,69 @@ export default function App() {
   const settingsRef = useRef<HTMLDivElement>(null)
   const gearBtnRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
+  const footerRef = useRef<HTMLElement>(null)
   const mode = getThemeMode(themeKey)
+  const isMobile = useIsMobile()
+  // QRコードは3画面（dashboard/control/anomaly）で共通のため、各コンポーネント側では持たず
+  // ここで一箇所だけ描画する。モバイル版・銘板ページ（quiz）では表示しない
+  const showQrCode = !isMobile && currentPage !== 'quiz'
+
+  // --- アイドル検知（モバイル版のみ：30分間ユーザー操作が無ければPLC接続を切る） ---
+  // モニタ版は展示会場で常時つけっぱなし運用のため、絶対に接続を切ってはいけない。
+  // モバイル版（来場者のスマホ等での閲覧）に限り、マウス・タッチ・キー操作が無い状態が
+  // 続いたらWebSocket接続を一時停止し、操作が再開されたら自動的に再接続する。
+  const [isIdle, setIsIdle] = useState(false)
+  const idleTimerRef = useRef<number | undefined>(undefined)
+
+  useEffect(() => {
+    if (!isMobile) {
+      // モニタ版では常時接続を維持するため、アイドル判定自体を行わない
+      setIsIdle(false)
+      return
+    }
+
+    const resetIdleTimer = () => {
+      setIsIdle(false)
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = window.setTimeout(() => setIsIdle(true), IDLE_TIMEOUT_MS)
+    }
+
+    const activityEvents = ['pointerdown', 'mousemove', 'keydown', 'touchstart', 'wheel'] as const
+    activityEvents.forEach((evt) => window.addEventListener(evt, resetIdleTimer, { passive: true }))
+    resetIdleTimer() // 初期化（マウント時点からタイマー開始）
+
+    return () => {
+      activityEvents.forEach((evt) => window.removeEventListener(evt, resetIdleTimer))
+      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current)
+    }
+  }, [isMobile])
+
+  const recentDates = getRecentDates(METRIC_DAYS)
+  const DATES = recentDates.map((d) => d.label)  //['MM/DD', 'MM/DD', 'MM/DD']
+  // 稼働実績5指標＋検査OK/NGのサンプルデータ（ダミー値）
+  const SAMPLE_METRICS: Record<Exclude<keyof MetricPoint, 'date'>, number[]> = {
+   inspectCount:  [ 150, 150, 150],
+   anomalyCount:  [ 12, 6, 4],
+   insertCount:   [ 96, 145, 118],
+   tightenCount:  [ 150, 150, 150],
+   loosenCount:   [ 152, 140, 145],
+   okCount:       [ 96, 145, 151],
+   ngCount:       [ 7, 4, 2],
+  }
+
+  const sampleMetrics: MetricPoint[] = DATES.map((date, i) => ({
+   date,
+   inspectCount: SAMPLE_METRICS.inspectCount[i] ?? 0,
+   anomalyCount: SAMPLE_METRICS.anomalyCount[i] ?? 0,
+   insertCount: SAMPLE_METRICS.insertCount[i] ?? 0,
+   tightenCount: SAMPLE_METRICS.tightenCount[i] ?? 0,
+   loosenCount: SAMPLE_METRICS.loosenCount[i] ?? 0,
+   okCount: SAMPLE_METRICS.okCount[i] ?? 0,
+   ngCount: SAMPLE_METRICS.ngCount[i] ?? 0,
+  }))
 
   const { data: plcData } = usePlcWebSocket({
-    enabled: true, // quizページでも受信したいので常時 true（他ページの設定次第で調整）
+    enabled: !isIdle, // モバイル版のみ、30分間操作が無ければ接続を切る（モニタ版はisIdleが常にfalseなので影響しない）
     isPlaying: true,
     intervalSec: 0.5,
     selectedAddresses: [
@@ -271,6 +308,27 @@ export default function App() {
   )
   }, [sidebarOpen])
 
+  // footerの実高さを --footer-h に反映する。
+  // QR(.app-qr)はfooterより上に浮かせて表示する必要があるため、
+  // headerと同様にResizeObserverで実測し、ハードコードの30pxに依存しないようにする。
+  useEffect(() => {
+    if (!footerRef.current) return
+    const el = footerRef.current
+    const update = () => {
+      // footerはCSSで display:none になる場合(モバイル)は offsetHeight が0になる。
+      // QR自体もモバイルでは非表示なので、0で問題ない。
+      document.documentElement.style.setProperty('--footer-h', `${el.offsetHeight}px`)
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    window.addEventListener('resize', update)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
   return (
     <div
       style={{
@@ -303,68 +361,70 @@ export default function App() {
        </div>
 
         <span className="app-header__title" style={{ color: theme.subtext,fontSize: '19px', }}>
-         {PAGES.find((p) => p.key === currentPage)?.label}
+         {isMobile && currentPage === 'control'
+           ? 'ROBOT PERM'
+           : PAGES.find((p) => p.key === currentPage)?.label}
         </span>
 
        
 
-{/* 右側をまとめる */}
-<div
-  className="header-right"
-  ref={gearBtnRef}
-  style={{
-    position: 'relative',
-    display: 'inline-block',
-    justifySelf: 'end',   // ← これを追加
-  }}
-  onMouseEnter={() => setIsGearHover(true)}
-  onMouseLeave={() => setIsGearHover(false)}
->
-  <button
-    onClick={(e) => {
-      e.stopPropagation()
-      setShowSettings((p) => !p)
-    }}
-    style={{
-      background: showSettings ? `${theme.accent}33` : 'transparent',
-      borderWidth: '1px',
-      borderStyle: 'solid',
-      borderColor: showSettings ? theme.accent : theme.border,
-      borderRadius: '8px',
-      padding: '6px 10px',
-      cursor: 'pointer',
-      fontSize: '15px',
-      lineHeight: 1,
-      transition: 'all 0.2s',
-    }}
-  >
-    ⚙️
-  </button>
+      {/* 右側をまとめる */}
+      <div
+        className="header-right"
+        ref={gearBtnRef}
+        style={{
+         position: 'relative',
+         display: 'inline-block',
+         justifySelf: 'end',
+        }}
+        onMouseEnter={() => setIsGearHover(true)}
+        onMouseLeave={() => setIsGearHover(false)}
+       >
+       <button
+         onClick={(e) => {
+          e.stopPropagation()
+          setShowSettings((p) => !p)
+        }}
+       style={{
+        background: showSettings ? `${theme.accent}33` : 'transparent',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: showSettings ? theme.accent : theme.border,
+        borderRadius: '8px',
+        padding: '6px 10px',
+        cursor: 'pointer',
+        fontSize: '15px',
+        lineHeight: 1,
+        transition: 'all 0.2s',
+       }}
+        >
+       ⚙️
+       </button>
 
-  <span
-    className="settings-tooltip"
-    style={{
-      position: 'absolute',
-      top: '100%',           // ← bottom指定より安定
-      marginTop: '6px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      background: 'rgba(0,0,0,0.75)',
-      color: '#fff',
-      fontSize: '11px',
-      padding: '2px 8px',
-      borderRadius: '4px',
-      whiteSpace: 'nowrap',
-      opacity: isTouchDevice ? 0 : (isGearHover ? 1 : 0),
-      pointerEvents: 'none',
-      transition: 'opacity 0.2s',
-      zIndex: 200,
-    }}
-    >
-     設定
-     </span>
-</div>
-      </header>
+       <span
+        className="settings-tooltip"
+        style={{
+         position: 'absolute',
+         top: '100%',           // ← bottom指定より安定
+         marginTop: '6px',
+         left: '50%',
+         transform: 'translateX(-50%)',
+         background: 'rgba(0,0,0,0.75)',
+         color: '#fff',
+         fontSize: '11px',
+         padding: '2px 8px',
+         borderRadius: '4px',
+         whiteSpace: 'nowrap',
+         opacity: isTouchDevice ? 0 : (isGearHover ? 1 : 0),
+         pointerEvents: 'none',
+         transition: 'opacity 0.2s',
+         zIndex: 200,
+         }}
+         >
+        設定
+       </span>
+       </div>
+    </header>
  
 
       {/* ヘッダー下レイアウト */}
@@ -389,6 +449,25 @@ export default function App() {
           footerHeight={30}
         />
 
+        {/* QRコード（dashboard/control/anomalyの3画面で共通。パネルフレームの外＝この階層で1回だけ描画する） */}
+        {showQrCode && (
+          <img src={theme.qr} alt="QRコード" className="app-qr" />
+        )}
+
+        {/* アイドル状態の通知（30分操作が無く接続を切っている間だけ表示。画面に触れると自動復帰） */}
+        {isIdle && (
+          <div
+            className="app-idle-banner"
+            style={{
+              background: theme.surface,
+              border: `1px solid ${theme.border}`,
+              color: theme.subtext,
+            }}
+          >
+            操作が無いため接続を一時停止中です（画面に触れると再開します）
+          </div>
+        )}
+
         {/* 設定パネル */}
         {showSettings && (
           <div ref={settingsRef}>
@@ -402,6 +481,7 @@ export default function App() {
               onPlayingChange={setIsPlaying}
               onEditingChange={setIsEditing}
               isNameplatePage={currentPage === 'quiz'}
+              isEditingEnabled={currentPage !== 'control' || !isMobile}
               onOpenAdmin={() => setIsAdminOpen(true)}
             />
           </div>
@@ -409,13 +489,12 @@ export default function App() {
 
         {/* ページコンテンツ（4項目）*/}
         <div className="dashboard-page" style={{ display: currentPage === 'dashboard' ? 'flex' : 'none' }}>
-          <RobotArmDashboard theme={theme} themeMode={getThemeMode(themeKey)} isEditing={isEditing} onEditingChange={setIsEditing}/>
+          <RobotArmDashboard theme={theme} isEditing={isEditing} onEditingChange={setIsEditing}/>
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'control' ? 'flex' : 'none' }}>
          <OperationResults
            theme={theme}
-           themeMode={getThemeMode(themeKey)}
            metrics={liveMetrics}
            isEditing={isEditing}
            activeStep={activeStep}
@@ -430,7 +509,6 @@ export default function App() {
         <div className="dashboard-page" style={{ display: currentPage === 'anomaly' ? 'flex' : 'none' }}>
           <OperationStatus
             theme={theme}
-            themeMode={getThemeMode(themeKey)}
             imageUrl={SHARED_ROBOT_IMAGE_URL}
             robotRB1={robotRB1}
             robotRB2={robotRB2}
@@ -447,11 +525,13 @@ export default function App() {
             themeMode={getThemeMode(themeKey)}
             isAdminOpen={isAdminOpen}
             onAdminOpenChange={setIsAdminOpen}
+            dateOptions={recentDates.map((d) => ({ label: d.label, value: d.key }))}
             
          />
         </div>
       </div>
       <footer
+        ref={footerRef}
         className="app-footer"
         style={{
           position: 'fixed',      

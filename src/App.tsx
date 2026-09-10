@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import './App.css'
 import type { ThemeKey, PageKey, NameplateQuestion } from './types'
 import { THEMES, PAGES, getThemeMode } from './components/common/themes'
-import Sidebar from './components/common/Sidebar'
+import Sidebar, { SIDEBAR_WIDTH } from './components/common/Sidebar'
 import SettingsPanel from './components/common/SettingsPanel'
 import OperationResults, { type MetricPoint } from './components/OperationResults/OperationResults'
 import RobotArmDashboard from './components/RobotArmDashboard/RobotArmDashboard'
@@ -304,7 +304,7 @@ export default function App() {
   useEffect(() => {
   document.documentElement.style.setProperty(
     '--panel-offset-x',
-    sidebarOpen ? '220px' : '0px'
+    sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px'
   )
   }, [sidebarOpen])
 

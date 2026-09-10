@@ -483,7 +483,7 @@ function NameplateQuizPreview({ theme }: { theme: Theme }) {
 
 // スライドパネルの幅。ブックマークタブの水平位置もこの値を基準に計算するため、
 // ここを変えれば両方が連動して動く。
-const SIDEBAR_WIDTH = 270
+export const SIDEBAR_WIDTH = 220
 
 type Props = {
   theme: Theme

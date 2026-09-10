@@ -617,15 +617,8 @@
   display: flex;
   width: 100%;
   min-height: 0;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.robot-dashboard__mobile-scroller::-webkit-scrollbar {
-  display: none;
 }
 
 .robot-dashboard__mobile-page {

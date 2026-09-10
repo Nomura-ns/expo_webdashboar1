@@ -147,15 +147,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
 
   // --- モバイル：タブクリック → 該当ページへスクロール ---
   const scrollToCameraIndex = (index: number) => {
-    const el = mobileScrollerRef.current
-    if (!el) return
-    isScrollingBySelf.current = true
-    el.scrollTo({ left: index * el.clientWidth, behavior: 'smooth' })
     setActiveCameraIndex(index)
-    // スムーススクロール完了後にフラグを戻す（スクロールイベントとの競合防止）
-    window.setTimeout(() => {
-      isScrollingBySelf.current = false
-    }, 400)
   }
 
   // --- モバイル：横スクロールでページが変わったらタブも追従させる ---
@@ -371,12 +363,8 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
               </div>
             )}
 
-            <div
-              ref={mobileScrollerRef}
-              className="robot-dashboard__mobile-scroller"
-              onScroll={handleMobileScroll}
-            >
-              {cameras.map(cam => {
+            <div className="robot-dashboard__mobile-scroller">
+              {activeCamera && [activeCamera].map(cam => {
                 const isAbnormal = cam.status === '異常'
                 return (
                   <div key={cam.id} className="robot-dashboard__mobile-page">

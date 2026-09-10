@@ -142,6 +142,19 @@ html, body {
 
 /* --- スマホ --- */
 @media (max-width: 768px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  #root {
+    height: auto;
+    min-height: 100vh;
+  }
+
   .logo {
     width: 110px;
     height: 18px;
@@ -168,6 +181,9 @@ html, body {
   .dashboard-page {
     width: 100%;
     margin-left: 0;
+    flex: 0 0 auto;
+    min-height: 0;
+    height: auto;
     /* 下部固定ナビ(64px)の分だけ余白を追加 */
     padding-bottom: calc(24px + 64px + env(safe-area-inset-bottom));
   }

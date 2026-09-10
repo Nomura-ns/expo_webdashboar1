@@ -593,7 +593,9 @@
 @media (max-width: 900px) {
   .robot-dashboard__body {
     flex-direction: column;
-    overflow-y: auto;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
   .robot-dashboard__edit-panel {
@@ -608,17 +610,17 @@
     flex: 0 0 auto;
     height: auto;
     min-height: 0;
+    overflow: visible;
   }
 }
 
 /* 横スクロールで1台ずつ切替（スナップ）。表示は常に1台のみ */
 .robot-dashboard__mobile-scroller {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   display: flex;
   width: 100%;
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: hidden;
+  overflow: visible;
 }
 
 .robot-dashboard__mobile-page {
@@ -635,7 +637,7 @@
 .robot-dashboard__mobile-frame {
   position: relative;
   width: 100%;
-  max-height: 100%;
+  max-height: none;
   border: 2px solid;
   border-radius: 10px;
   overflow: hidden;

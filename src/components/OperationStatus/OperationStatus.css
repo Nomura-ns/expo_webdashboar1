@@ -753,7 +753,15 @@
 
 @media (max-width: 640px) {
   .axis-monitor {
-    overflow-y: auto; /* モバイルは縦スクロールを許可 */
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .axis-monitor__body,
+  .axis-monitor__main-col {
+    min-height: 0;
+    height: auto;
   }
 
   .axis-monitor__rows {
@@ -762,6 +770,14 @@
 
   .axis-table-scroll {
     display: block;
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .axis-table {
+    min-width: 480px;
   }
 
   .axis-monitor__footer {

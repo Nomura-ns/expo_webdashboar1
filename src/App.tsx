@@ -518,7 +518,7 @@ export default function App() {
           />
         </div>
 
-        <div className="dashboard-page" style={{ display: currentPage === 'quiz' ? 'flex' : 'none' }}>
+        <div className="dashboard-page dashboard-page--nameplate" style={{ display: currentPage === 'quiz' ? 'flex' : 'none' }}>
           <NameplateQuiz
             theme={theme}
             questions={sampleQuestions}

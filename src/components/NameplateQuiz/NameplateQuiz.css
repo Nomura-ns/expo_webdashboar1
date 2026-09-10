@@ -663,23 +663,35 @@
 }
 
 @media (max-width: 768px) {
-  .panel-frame__body {
+  .panel-frame.nameplate-quiz {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .panel-frame.nameplate-quiz .panel-frame__body {
     width: 100%;
     max-width: 100%;
-    height: auto;          /* ← 高さは親に任せる */
-    max-height: none;      /* ← これが重要 */
-    overflow-y: auto;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
     overflow-x: hidden;
     padding: 12px 14px;
     box-sizing: border-box;
   }
 
-   .panel-frame.nameplate-quiz {
+  .dashboard-page.dashboard-page--nameplate {
+    height: calc(100dvh - var(--header-h, 0px));
+    flex: 0 0 calc(100dvh - var(--header-h, 0px));
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .panel-frame.nameplate-quiz {
     width: 100%;
     max-width: 100%;
-    /* height / max-height の指定は削除してflexに任せる */
-    overflow-y: auto;
-    overflow-x: hidden;
     padding: 12px 14px;
     box-sizing: border-box;
   }

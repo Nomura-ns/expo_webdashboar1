@@ -250,6 +250,15 @@
   white-space: nowrap;
 }
 
+.robot-header-badge--clickable {
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.robot-header-badge--clickable:active {
+  transform: scale(0.98);
+}
+
 .robot-header-badge__caption {
   font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
@@ -375,6 +384,14 @@
   filter: drop-shadow(0 0 4px currentColor);
 }
 
+.speed-gauge--icon-right {
+  flex-direction: row-reverse;
+}
+
+.speed-gauge--icon-right .speed-gauge__body {
+  text-align: right;
+}
+
 .speed-gauge__divider {
   width: 1px;
   align-self: stretch;
@@ -398,6 +415,8 @@
 
 .speed-gauge__track {
   position: relative;
+  display: flex;
+  justify-content: flex-start;
   height: 18px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
@@ -410,6 +429,10 @@
   border-radius: 999px;
   /* PLC値の更新に合わせて滑らかに追従させる */
   transition: width 0.4s ease;
+}
+
+.speed-gauge__track--reverse {
+  justify-content: flex-end;
 }
 
 /* 平均速度ゲージはモニタ（大画面）専用。狭幅では横スクロール防止のため非表示にし、
@@ -631,6 +654,8 @@
 
 .speed-bar__track {
   position: relative;
+  display: flex;
+  justify-content: flex-start;
   flex: 1;
   min-width: 0;
   height: 16px;
@@ -647,6 +672,10 @@
   filter: brightness(1.12) saturate(1.08);
   box-shadow: 0 0 8px currentColor;
   transition: width 0.3s ease;
+}
+
+.speed-bar__track--reverse {
+  justify-content: flex-end;
 }
 
 .speed-bar__value {
@@ -668,6 +697,14 @@
 }
 
 .axis-monitor__speed-caption {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  padding: 6px 16px;
+  border: 2px solid color-mix(in srgb, currentColor 33%, transparent);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
   font-size: 25px;
   font-weight: 700;
   text-align: center;
@@ -777,10 +814,25 @@
   font-weight: 800;
 }
 
+.axis-table__rb-toggle {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
 /* 警告（しきい値80%到達〜70%以下で解除）：文字色は変えず、フリッカ（点滅）のみで
    通知する（モニタ版の.axis-row--warningと動作を統一） */
 .axis-table__cell--warning {
   animation: axis-table-cell-flicker 1s ease-in-out infinite;
+}
+
+.axis-table__peak-value--near {
+  color: #ffeb3b;
+  font-weight: 800;
 }
 
 @keyframes axis-table-cell-flicker {
@@ -794,6 +846,14 @@
   display: none;
   gap: 8px;
   padding: 2px 0 4px;
+}
+
+.axis-monitor__mobile-average-torque {
+  display: none;
+}
+
+.axis-monitor__mobile-average-torque-label {
+  display: none;
 }
 
 .axis-monitor__mobile-rb-btn {
@@ -965,6 +1025,11 @@
   .axis-monitor__header-center { grid-column: 2; }
   .axis-monitor__header-rb2 { grid-column: 3; justify-content: flex-end; }
 
+  .axis-monitor__header-center,
+  .axis-monitor__speed-caption-row {
+    display: none;
+  }
+
   /* 狭幅では平均速度ゲージを非表示にし、RB1/RB2ラベル箱のみ残す
     （従来のspeed-gauge-row非表示と同等の挙動） */
   .axis-monitor__header-rb1 > .speed-gauge,
@@ -1036,19 +1101,58 @@
   }
 
   .axis-monitor__mobile-rb-toggle {
+    display: none;
+  }
+
+  .axis-monitor__mobile-average-torque {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .axis-monitor__mobile-average-torque-label {
+    display: block;
+    margin: 4px 0 4px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .axis-monitor__mobile-torque-card {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 0.85rem;
+    transition: opacity 0.2s ease;
+  }
+
+  .axis-monitor__mobile-torque-card strong {
+    font-size: 1.1rem;
+    white-space: nowrap;
+  }
+
+  .axis-monitor__mobile-torque-card.is-dimmed {
+    opacity: 0.35;
   }
 
   .axis-table-scroll {
     display: block;
     flex: 0 0 auto;
     min-height: 0;
-    overflow-x: auto;
+    overflow-x: scroll;
     overflow-y: hidden;
+    scrollbar-width: auto;
   }
 
   .axis-table {
-    min-width: 480px;
+    min-width: 620px;
   }
 
   .axis-monitor__footer {

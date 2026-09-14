@@ -21,22 +21,21 @@ const OK_COLOR = '#4fbf8f'
 const NG_COLOR = '#d9713c'
 
 // ── ①全体フロー（フロー画面草案.pdf「全体」を参照） ─────────────────────
-// 刃物取付 → インターバル → 刃物取外 → 検査 → 検査結果OK？
+// 刃物取付 → 刃物取外 → 検査 → 検査結果OK？
 //   YES（OK） … 刃物交換を飛ばして「刃物ストックへ返却」へ
 //   NO （NG） … 刃物交換 → 刃物ストックへ返却
 // → 動作準備 → （先頭「刃物取付」へループ）
 //
-// 修正依頼（草案PDF）により、検査結果とその後の工程は「判明してから表示する」
-// 方式に変更。そのため刃物交換のみ判定結果に応じて出し入れする分岐ノードとして扱う。
+// 検査結果に到達したら判定信号に応じて後続工程を表示する。
+// NOは刃物交換を経由し、YESは刃物交換を飛ばして刃物ストックへ返却する。
 const OVERALL_FLOW: FlowNodeDef[] = [
   { id: 'ov-1', kind: 'process', label: '刃物取付', plcStep: 1 },
-  { id: 'ov-2', kind: 'process', label: 'インターバル', plcStep: 2 },
-  { id: 'ov-3', kind: 'process', label: '刃物取外', plcStep: 3 },
-  { id: 'ov-4', kind: 'process', label: '検査', plcStep: 4 },
-  { id: 'ov-d', kind: 'decision', label: '検査結果\nOK？', plcStep: 5 },
-  { id: 'ov-5', kind: 'process', label: '刃物交換', plcStep: 6 },
-  { id: 'ov-6', kind: 'process', label: '刃物ストックへ\n返却', plcStep: 7 },
-  { id: 'ov-7', kind: 'process', label: '動作準備', plcStep: 8 },
+  { id: 'ov-3', kind: 'process', label: '刃物取外', plcStep: 2 },
+  { id: 'ov-4', kind: 'process', label: '検査', plcStep: 3 },
+  { id: 'ov-d', kind: 'decision', label: '検査結果\nOK？', plcStep: 4 },
+  { id: 'ov-5', kind: 'process', label: '刃物交換', plcStep: 5 },
+  { id: 'ov-6', kind: 'process', label: '刃物ストックへ\n返却', plcStep: 6 },
+  { id: 'ov-7', kind: 'process', label: '動作準備', plcStep: 7 },
 ]
 const OVERALL_DECISION_STEP = OVERALL_FLOW.find((n) => n.id === 'ov-d')!.plcStep!
 
@@ -54,19 +53,15 @@ function computeProgress(nodes: FlowNodeDef[], activeStep: number | undefined, t
 
 /**
  * 全体フローの表示ノードを、検査結果が判明しているかどうかに応じて組み立てる。
- * 判明前：検査結果の分岐（◆）まで表示。判明後：NGなら「刃物交換」を挟み、OKなら飛ばす。
- * 進捗の分母は「基本工程が多いパターン（NG＝8工程）」を初期値とし、
- * OKと判明した時点で7工程に縮める。
+ * 判明前：検査結果の分岐（◆）まで表示。NOなら「刃物交換」を挟み、YESなら飛ばす。
+ * 進捗の分母は「基本工程が多いパターン（NG＝7工程）」を初期値とし、
+ * OKと判明した時点で6工程に縮める。
  */
 function resolveOverallFlow(activeStep: number | undefined, ngSignal: boolean | undefined) {
-  const decisionIdx = OVERALL_FLOW.findIndex((n) => n.id === 'ov-d')
-  const resolved = activeStep !== undefined && activeStep > OVERALL_DECISION_STEP
-  const nodes = resolved
-    ? ngSignal
-      ? OVERALL_FLOW
-      : OVERALL_FLOW.filter((n) => n.id !== 'ov-5')
-    : OVERALL_FLOW.slice(0, decisionIdx + 1)
-  const progress = computeProgress(nodes, activeStep, resolved ? undefined : OVERALL_FLOW.length)
+  const resolved = activeStep !== undefined && activeStep >= OVERALL_DECISION_STEP && ngSignal !== undefined
+  const nodes = OVERALL_FLOW
+  const progressNodes = resolved && ngSignal === false ? nodes.filter((n) => n.id !== 'ov-5') : nodes
+  const progress = computeProgress(progressNodes, activeStep, resolved ? undefined : OVERALL_FLOW.length)
   return { nodes, resolved, progress }
 }
 
@@ -102,15 +97,15 @@ function estimateNodeWidth(label: string, minWidth: number, charPx = 20, padding
 }
 
 const OVERALL_SIZING: SizingConfig = {
-  boxW: 195,
-  boxH: 74,
-  diamondW: 138,
+  boxW: 170,
+  boxH: 68,
+  diamondW: 124,
   diamondH: 108,
   termW: 96,
   termH: 50,
-  gapX: 50,
-  leftPad: 18,
-  rightPad: 18,
+  gapX: 28,
+  leftPad: 14,
+  rightPad: 14,
   topPad: 24,
   bottomPad: 24,
   lineHeight: 21,
@@ -293,6 +288,11 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
     return renderBox(p)
   }
 
+  const decisionPosition = positioned.find((p) => p.node.id === 'ov-d')
+  const replacementPosition = positioned.find((p) => p.node.id === 'ov-5')
+  const returnPosition = positioned.find((p) => p.node.id === 'ov-6')
+  const bypassExchange = resolvedChip?.label === 'OK' && decisionPosition && replacementPosition && returnPosition
+
   return (
     <div
       className={`op-results__flow-scroll${scrollClassName ? ` ${scrollClassName}` : ''}`}
@@ -307,18 +307,32 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
             </marker>
           </defs>
           {positioned.map((p) => renderNode(p))}
-          {positioned.slice(0, -1).map((p, i) => (
-            <line
-              key={`${p.node.id}-arrow`}
-              x1={p.right}
-              y1={rowCenterY}
-              x2={positioned[i + 1].left}
-              y2={rowCenterY}
+          {positioned.slice(0, -1).map((p, i) => {
+            const next = positioned[i + 1]
+            const isSkippedExchangeEdge = bypassExchange && (p.node.id === 'ov-d' || p.node.id === 'ov-5')
+            if (isSkippedExchangeEdge) return null
+            return (
+              <line
+                key={`${p.node.id}-arrow`}
+                x1={p.right}
+                y1={rowCenterY}
+                x2={next.left}
+                y2={rowCenterY}
+                stroke={theme.accent}
+                strokeWidth={2}
+                markerEnd={`url(#${markerId})`}
+              />
+            )
+          })}
+          {bypassExchange && (
+            <path
+              d={`M ${decisionPosition.right} ${rowCenterY} C ${decisionPosition.right + 30} ${rowCenterY - 70}, ${returnPosition.left - 30} ${rowCenterY - 70}, ${returnPosition.left} ${rowCenterY}`}
+              fill="none"
               stroke={theme.accent}
               strokeWidth={2}
               markerEnd={`url(#${markerId})`}
             />
-          ))}
+          )}
           {/* 現在工程を指すポインター。工程が進むとtransformのtransitionでスライド移動する
               （仕様書：フロー上を移動するポインター／工程移動時は滑らかに遷移） */}
           {focusTarget && (

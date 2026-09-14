@@ -44,6 +44,8 @@ export type CameraFeed = {
   label: string
   /** 撮影箇所（例: "正面" / "背面" / "側面"） */
   location?: string
+  /** 現在の工程内容 */
+  processContent?: string
   imageUrl?: string
   status?: CameraCheckStatus
   pos: Vec2   // キャンバス内の位置（% 座標）
@@ -52,4 +54,6 @@ export type CameraFeed = {
   completedSteps?: number
   /** 全工程数 */
   totalSteps?: number
+   /** 割り当てた物理カメラのdeviceId（getUserMediaで取得した映像デバイス） */
+  deviceId?: string
 }

@@ -27,6 +27,10 @@ interface Props {
   textColor?: string
   /** キャプション（アーム稼働率）文字色 */
   captionColor?: string
+  /** モバイル表示でRB切替に使用するクリック処理 */
+  onClick?: () => void
+  /** 選択されていないRBを減光表示する */
+  dimmed?: boolean
 }
 
 export default function RobotHeaderBadge({
@@ -35,6 +39,8 @@ export default function RobotHeaderBadge({
   align,
   layout = 'inline',
   textColor,
+  onClick,
+  dimmed = false,
 }: Props) {
   const text = (
     <div className="robot-header-badge__text">
@@ -46,8 +52,14 @@ export default function RobotHeaderBadge({
 
   return (
     <div
-      className={`robot-header-badge robot-header-badge--${align} robot-header-badge--${layout}`}
-      style={layout === 'boxed' ? { borderColor: `${textColor ?? color}99` } : undefined}
+      className={`robot-header-badge robot-header-badge--${align} robot-header-badge--${layout}${onClick ? ' robot-header-badge--clickable' : ''}`}
+      style={{
+        ...(layout === 'boxed' ? { borderColor: `${textColor ?? color}99` } : {}),
+        ...(dimmed ? { opacity: 0.35 } : {}),
+      }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
     >
       {text}
     </div>

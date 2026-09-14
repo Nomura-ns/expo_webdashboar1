@@ -34,6 +34,12 @@ interface Props {
   selectedRB?: RobotKey | null
 }
 
+const PEAK_PROXIMITY_THRESHOLD = 10
+
+function isNearPeak(value: number, peak: number) {
+  return Math.abs(peak - value) <= PEAK_PROXIMITY_THRESHOLD
+}
+
 export default function AxisTable({
   rows,
   rb1Color,
@@ -54,18 +60,10 @@ export default function AxisTable({
             <th rowSpan={2} style={{ color: theme.subtext, borderColor: theme.border }}>
               軸
             </th>
-            <th
-              colSpan={2}
-              className="axis-table__group-head"
-              style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}
-            >
+            <th colSpan={2} className="axis-table__group-head" style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
               RB1
             </th>
-            <th
-              colSpan={2}
-              className="axis-table__group-head"
-              style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}
-            >
+            <th colSpan={2} className="axis-table__group-head" style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
               RB2
             </th>
           </tr>
@@ -88,6 +86,8 @@ export default function AxisTable({
           {rows.map((row) => {
             // 現在値/Peak値表記の「/」はモニタ版（TorqueBar）の表記と統一している
             const isWarning = warningAxes[row.axis - 1] ?? false
+            const rb1PeakNear = isNearPeak(row.rb1.torqueValue, row.rb1.torquePeak)
+            const rb2PeakNear = isNearPeak(row.rb2.torqueValue, row.rb2.torquePeak)
             return (
               <tr key={row.axis}>
                 <td className="axis-table__label" style={{ color: theme.text, borderColor: theme.border }}>
@@ -100,7 +100,10 @@ export default function AxisTable({
                   className={isWarning ? 'axis-table__cell--warning' : undefined}
                   style={{ color: theme.text, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}
                 >
-                  {row.rb1.torqueValue} / {row.rb1.torquePeak}
+                  {row.rb1.torqueValue}% /{' '}
+                  <span className={rb1PeakNear ? 'axis-table__peak-value--near' : undefined}>
+                    {row.rb1.torquePeak}%
+                  </span>
                 </td>
                 <td style={{ color: theme.text, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
                   {row.rb2.speed}%
@@ -109,7 +112,10 @@ export default function AxisTable({
                   className={isWarning ? 'axis-table__cell--warning' : undefined}
                   style={{ color: theme.text, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}
                 >
-                  {row.rb2.torqueValue} / {row.rb2.torquePeak}
+                  {row.rb2.torqueValue}% /{' '}
+                  <span className={rb2PeakNear ? 'axis-table__peak-value--near' : undefined}>
+                    {row.rb2.torquePeak}%
+                  </span>
                 </td>
               </tr>
             )

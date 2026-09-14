@@ -17,6 +17,8 @@ interface Props {
   color: string // RB1_COLOR / RB2_COLOR、または編集パネルでのカスタムカラー
   /** 数値をゲージのどちら側に表示するか。RB1は'right'、RB2は'left'（どちらも軸ラベル側＝中央寄り） */
   valueSide: 'left' | 'right'
+  /** trueの場合、ゲージを右端から左向きに満たす */
+  reverse?: boolean
   /** 数値の文字色。省略時はcolorをそのまま使用 */
   valueTextColor?: string
   trackColor?: string
@@ -26,7 +28,7 @@ function clampPct(v: number) {
   return Math.min(100, Math.max(0, v))
 }
 
-export default function SpeedBar({ value, color, valueSide, valueTextColor, trackColor }: Props) {
+export default function SpeedBar({ value, color, valueSide, valueTextColor, trackColor, reverse = false }: Props) {
   const clamped = clampPct(value)
 
   const gauge = (
@@ -48,7 +50,7 @@ export default function SpeedBar({ value, color, valueSide, valueTextColor, trac
           <circle cx="12" cy="16" r="1.3" fill="currentColor" stroke="none" />
         </svg>
       </span>
-      <div className="speed-bar__track" style={{ background: trackColor }}>
+      <div className={`speed-bar__track${reverse ? ' speed-bar__track--reverse' : ''}`} style={{ background: trackColor }}>
         <div
           className="speed-bar__fill"
           style={{ width: `${clamped}%`, background: color, color }}

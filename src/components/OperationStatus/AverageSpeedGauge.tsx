@@ -12,29 +12,38 @@
 import type { CSSProperties } from 'react'
 
 interface Props {
-  /** 6軸平均速度（0〜100%） */
+  /** 6軸平均値（0〜100%） */
   value: number
   /** ゲージの発光色・充填色（rb1Color / rb2Color） */
   color: string
   /** ゲージ内のラベル文言（例：'RB1 平均速度'） */
   label: string
+  /** trueの場合、ゲージを右端から左向きに満たす */
+  reverse?: boolean
+  /** trueの場合、アイコンを右側、ラベルを右寄せにする */
+  iconOnRight?: boolean
 }
 
 function clampPct(v: number) {
   return Math.min(100, Math.max(0, v))
 }
 
-export default function AverageSpeedGauge({ value, color, label }: Props) {
+export default function AverageSpeedGauge({ value, color, label, reverse = false, iconOnRight = false }: Props) {
   const pct = clampPct(value)
 
   const fillStyle: CSSProperties = {
     width: `${pct}%`,
-    background: `linear-gradient(90deg, ${color}66, ${color})`,
+    background: reverse
+      ? `linear-gradient(90deg, ${color}, ${color}66)`
+      : `linear-gradient(90deg, ${color}66, ${color})`,
     boxShadow: `0 0 10px ${color}, 0 0 22px ${color}66`,
   }
 
   return (
-    <div className="speed-gauge" style={{ borderColor: `${color}55`, boxShadow: `0 0 18px ${color}22` }}>
+    <div
+      className={`speed-gauge${iconOnRight ? ' speed-gauge--icon-right' : ''}`}
+      style={{ borderColor: `${color}55`, boxShadow: `0 0 18px ${color}22` }}
+    >
       <div className="speed-gauge__icon" style={{ color }}>
         {/* ロボットアームのシンプルなシルエットアイコン */}
         <svg
@@ -61,7 +70,7 @@ export default function AverageSpeedGauge({ value, color, label }: Props) {
         <div className="speed-gauge__label" style={{ color }}>
           {label}
         </div>
-        <div className="speed-gauge__track">
+        <div className={`speed-gauge__track${reverse ? ' speed-gauge__track--reverse' : ''}`}>
           <div className="speed-gauge__fill" style={fillStyle} />
         </div>
       </div>

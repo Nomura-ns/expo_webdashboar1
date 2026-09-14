@@ -51,7 +51,7 @@ export default function AxisRow({
 
   return (
     <div className={`axis-row${isWarning ? ' axis-row--warning' : ''}`}>
-      <SpeedBar value={rb1.speed} color={rb1Color} valueSide="right" />
+      <SpeedBar value={rb1.speed} color={rb1Color} valueSide="right" reverse />
 
       <TorqueBar
         side="left"

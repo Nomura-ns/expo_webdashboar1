@@ -143,12 +143,12 @@ export default function OperationStatus({
     })
   }, [])
 
-  // 6軸平均速度（速度%のみの平均。トルクは含めない）。履歴は持たず現在値のみを
+  // 6軸平均トルク（トルク%のみの平均）。履歴は持たず現在値のみを
   // ガラス調ゲージで表示する（各トルクグラフ群の直上・モニタ版のみ）
-  const rb1AvgSpeed = axisRows.reduce((sum, r) => sum + r.rb1.speed, 0) / axisRows.length
-  const rb2AvgSpeed = axisRows.reduce((sum, r) => sum + r.rb2.speed, 0) / axisRows.length
+  const rb1AvgTorque = axisRows.reduce((sum, r) => sum + r.rb1.torqueValue, 0) / axisRows.length
+  const rb2AvgTorque = axisRows.reduce((sum, r) => sum + r.rb2.torqueValue, 0) / axisRows.length
 
-  // モバイルRB切替：タップした側を強調、もう一方を減光する（AxisTable側で減光処理）
+  // モバイルRB切替：選択中の側を強調し、同じ側を再タップすると両方を通常表示に戻す
   const [selectedMobileRB, setSelectedMobileRB] = useState<RobotKey | null>(null)
   const handleMobileRBToggle = (rb: RobotKey) => {
     setSelectedMobileRB((prev) => (prev === rb ? null : rb))
@@ -173,36 +173,20 @@ export default function OperationStatus({
                   layout="boxed"
                   textColor={rb1Color}
                   captionColor={theme.subtext}
+                  onClick={() => handleMobileRBToggle('RB1')}
+                  dimmed={selectedMobileRB === 'RB2'}
                 />
-                <AverageSpeedGauge value={rb1AvgSpeed} color={rb1Color} label="平均速度" />
-              </div>
-
-              <div className="axis-monitor__header-center">
-                <div
-                  className="axis-monitor__torque-badge"
-                  style={{ borderColor: `${theme.text}55`, color: theme.text }}
-                >
-                  <svg
-                    className="axis-monitor__torque-badge-icon"
-                    viewBox="0 0 24 24"
-                    width="22"
-                    height="22"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M12 3 L12 21" />
-                    <path d="M8 7 L12 3 L16 7" />
-                    <path d="M8 17 L12 21 L16 17" />
-                  </svg>
-                  トルク
-                </div>
+                <AverageSpeedGauge
+                  value={rb1AvgTorque}
+                  color={rb1Color}
+                  label="平均トルク"
+                  reverse
+                  iconOnRight
+                />
               </div>
 
               <div className="axis-monitor__header-rb2">
-                <AverageSpeedGauge value={rb2AvgSpeed} color={rb2Color} label="平均速度" />
+                <AverageSpeedGauge value={rb2AvgTorque} color={rb2Color} label="平均トルク" />
                 <RobotHeaderBadge
                   label="RB2"
                   colorKey="RB2"
@@ -212,6 +196,8 @@ export default function OperationStatus({
                   layout="boxed"
                   textColor={rb2Color}
                   captionColor={theme.subtext}
+                  onClick={() => handleMobileRBToggle('RB2')}
+                  dimmed={selectedMobileRB === 'RB1'}
                 />
               </div>
             </div>
@@ -219,8 +205,20 @@ export default function OperationStatus({
             {/* 「速度」の文字は各軸行で繰り返さず、ここで1か所だけ表示する
                （RB1側＝1列目／RB2側＝5列目。軸ごとのSpeedBarはアイコンのみ） */}
             <div className="axis-monitor__speed-caption-row">
-              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb1">速度</span>
-              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb2">速度</span>
+              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb1" style={{ color: theme.text }}>
+                速度 (mm/s)
+              </span>
+              <div className="axis-monitor__header-center">
+                <div
+                  className="axis-monitor__torque-badge"
+                  style={{ borderColor: `${theme.text}55`, color: theme.text }}
+                >
+                  トルク (N·m)
+                </div>
+              </div>
+              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb2" style={{ color: theme.text }}>
+                速度 (mm/s)
+              </span>
             </div>
 
             {/* 軸1〜6：モニタ表示（グリッド＋ゲージ）。モバイル幅ではCSSで非表示にする */}
@@ -238,27 +236,23 @@ export default function OperationStatus({
               ))}
             </div>
 
-            {/* モバイル表示：グラフ／ゲージの代わりに表形式（横スクロール可）。
-               モニタ幅ではCSSで非表示にする */}
-            {/* RB1/RB2切替トグル（モバイル幅のみCSSで表示）。押した側を強調、
-               もう一方をAxisTable側で減光表示する */}
-            <div className="axis-monitor__mobile-rb-toggle">
-              <button
-                type="button"
-                className={`axis-monitor__mobile-rb-btn${selectedMobileRB === 'RB1' ? ' axis-monitor__mobile-rb-btn--active' : ''}`}
+            {/* モバイル表示：平均トルクカード、RB切替、軸別データ表 */}
+            <div className="axis-monitor__mobile-average-torque-label" style={{ color: theme.text }}>
+              平均トルク
+            </div>
+            <div className="axis-monitor__mobile-average-torque">
+              <div
+                className={`axis-monitor__mobile-torque-card${selectedMobileRB === 'RB2' ? ' is-dimmed' : ''}`}
                 style={{ borderColor: rb1Color, color: rb1Color }}
-                onClick={() => handleMobileRBToggle('RB1')}
               >
-                RB1
-              </button>
-              <button
-                type="button"
-                className={`axis-monitor__mobile-rb-btn${selectedMobileRB === 'RB2' ? ' axis-monitor__mobile-rb-btn--active' : ''}`}
+                <strong>{Math.round(rb1AvgTorque)}%</strong>
+              </div>
+              <div
+                className={`axis-monitor__mobile-torque-card${selectedMobileRB === 'RB1' ? ' is-dimmed' : ''}`}
                 style={{ borderColor: rb2Color, color: rb2Color }}
-                onClick={() => handleMobileRBToggle('RB2')}
               >
-                RB2
-              </button>
+                <strong>{Math.round(rb2AvgTorque)}%</strong>
+              </div>
             </div>
 
             <AxisTable

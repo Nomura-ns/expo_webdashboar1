@@ -4,6 +4,7 @@ import PanelFrame from '../common/PanelFrame'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import type {CameraFeed } from '../../types/common'
 import './RobotArmDashboard.css'
+import { useCameraDeviceStreams } from '../../hooks/useCameraDeviceStreams'
 
 type Props = {
   theme: Theme
@@ -59,7 +60,7 @@ const getStatusColor = (status: CameraStatus, theme: Theme, abnormalColor: strin
 const createInitialCameras = (): CameraFeed[] => [
   {
     id: 'cam-1',
-    label: 'カメラ1',
+    label: 'RB1',
     location: '正面',
     pos: { x: 25, y: 50 },
     size: 800,
@@ -69,7 +70,7 @@ const createInitialCameras = (): CameraFeed[] => [
   },
   {
     id: 'cam-2',
-    label: 'カメラ2',
+    label: 'RB2',
     location: '背面',
     pos: { x: 75, y: 50 },
     size: 800,
@@ -99,6 +100,11 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
   const [cameras, setCameras] = useState<CameraFeed[]>(createInitialCameras())
   const [countInput, setCountInput] = useState(String(cameras.length))
 
+  const deviceIdsById = Object.fromEntries(cameras.map(c => [c.id, c.deviceId]))
+  const { streamsByDeviceId, devices, error: cameraError, requestPermission } =
+    useCameraDeviceStreams(deviceIdsById)
+
+  
   // 運転中／停止中の表示（実際のPLC稼働信号に繋ぐまでの仮のテスト表示）
   const [isRunning, setIsRunning] = useState(true)
 
@@ -143,7 +149,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
       return next && next !== cam.status ? { ...cam, status: next } : cam
     })
   )
-}, [plcStatusById])
+ }, [plcStatusById])
 
   const canvasBg = isLightColor(theme.bg) ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.14)'
   const abnormalColor = isLightColor(theme.bg) ? ABNORMAL_COLOR_LIGHT : ABNORMAL_COLOR_DARK
@@ -283,9 +289,12 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
 
   // --- カメラ枠の中身（画像 / プレースホルダー / オーバーレイ）はデスクトップ・モバイル・分割表示で共通 ---
   const renderCameraContent = (cam: CameraFeed) => {
+  const stream = cam.deviceId ? streamsByDeviceId[cam.deviceId] : undefined
   return (
     <>
-      {cam.imageUrl ? (
+      {stream ? (
+        <CameraVideo stream={stream} />
+      ) : cam.imageUrl ? (
         <img src={cam.imageUrl} alt={cam.label} draggable={false} />
       ) : (
         <div className="robot-dashboard__camera-placeholder">NO SIGNAL</div>
@@ -358,10 +367,6 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
 
                 <div className="robot-dashboard__mobile-status-info">
                   <span className="robot-dashboard__mobile-status-info-item">
-                    <span className="robot-dashboard__mobile-status-info-label">撮影箇所</span>
-                    <span>{activeCamera.location || '-'}</span>
-                  </span>
-                  <span className="robot-dashboard__mobile-status-info-item">
                     <span className="robot-dashboard__mobile-status-info-label">状態</span>
                     <span className={activeCamera.status === '異常' ? 'is-abnormal' : 'is-normal'}>
                       {activeCamera.status}
@@ -370,7 +375,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                   <span className="robot-dashboard__mobile-status-info-item">
                     <span className="robot-dashboard__mobile-status-info-label">完了工程</span>
                     <span>
-                      {activeCamera.completedSteps ?? 0} / {activeCamera.totalSteps ?? 0}
+                      {activeCamera.processContent || '-'} / {activeCamera.completedSteps ?? 0} / {activeCamera.totalSteps ?? 0}
                     </span>
                   </span>
                 </div>
@@ -397,7 +402,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
           /* --- デスクトップ版：ステータスカード + メインカメラモニター --- */
           <div className="robot-dashboard__monitor">
             <div className="robot-dashboard__status-row">
-              {cameras.map(cam => {
+              {cameras.map((cam, i) => {
                 const isAbnormal = cam.status === '異常'
                 return (
                   <div
@@ -405,10 +410,8 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                     className="robot-dashboard__info-card"
                     style={{ background: theme.headerBg, borderColor: theme.border }}
                   >
-                    <div className="robot-dashboard__info-card-header">{cam.label}</div>
-                    <div className="robot-dashboard__info-row">
-                      <span className="robot-dashboard__info-row-label">撮影箇所</span>
-                      <span>{cam.location || '-'}</span>
+                    <div className="robot-dashboard__info-card-header">
+                      {i === 0 ? 'RB1' : i === 1 ? 'RB2' : cam.label}
                     </div>
                     <div className="robot-dashboard__info-row">
                       <span className="robot-dashboard__info-row-label">状態</span>
@@ -417,7 +420,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                     <div className="robot-dashboard__info-row">
                       <span className="robot-dashboard__info-row-label">完了工程</span>
                       <span>
-                        {cam.completedSteps ?? 0} / {cam.totalSteps ?? 0}
+                        {cam.processContent || '-'} / {cam.completedSteps ?? 0} / {cam.totalSteps ?? 0}
                       </span>
                     </div>
                   </div>
@@ -447,7 +450,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                           className={`robot-dashboard__rotate-chip${i === monitorIndex ? ' is-active' : ''}`}
                           style={i === monitorIndex ? { color: theme.accent } : undefined}
                         >
-                          {cam.label}
+                          {`カメラ${i + 1}`}
                         </span>
                       ))}
                     </div>
@@ -535,7 +538,15 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
               </section>
 
               <section className="robot-dashboard__panel-section">
-                <h3>カメラ台数</h3>
+              <h3>カメラ映像</h3>
+              <button type="button" onClick={requestPermission}>
+                 カメラへのアクセスを許可
+              </button>
+             {cameraError && <p className="robot-dashboard__panel-hint">{cameraError}</p>}
+             </section>
+
+             <section className="robot-dashboard__panel-section">
+             <h3>カメラ台数</h3>
                 <div className="robot-dashboard__toolbar-row">
                   <button type="button" onClick={removeCamera} disabled={cameras.length <= MIN_CAMERAS}>
                     −
@@ -593,20 +604,23 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                         />
                       </label>
                       <label className="robot-dashboard__field">
-                        <span>撮影箇所</span>
-                        <input
-                          type="text"
-                          id={`camera-location-${cam.id}`}
-                          name={`cameraLocation-${cam.id}`}
-                          placeholder="例: 正面 / 背面 / 側面"
-                          value={cam.location ?? ''}
-                          onChange={e => updateCamera(cam.id, { location: e.target.value })}
-                        />
-                      </label>
+                      <span>映像ソース</span>
+                       <select
+                         id={`camera-device-${cam.id}`}
+                         name={`cameraDevice-${cam.id}`}
+                         value={cam.deviceId ?? ''}
+                         onChange={e => updateCamera(cam.id, { deviceId: e.target.value || undefined })}
+                        >
+                      <option value="">未割り当て（プレースホルダー）</option>
+                      {devices.map(d => (
+                          <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+                       ))}
+                     </select>
+                    </label>
 
-                      <button
-                        type="button"
-                        className={`robot-dashboard__status-toggle${cam.status === '異常' ? ' is-abnormal' : ' is-normal'}`}
+<button
+  type="button"
+  className={`robot-dashboard__status-toggle${cam.status === '異常' ? ' is-abnormal' : ' is-normal'}`}
                         onClick={() => toggleStatus(cam.id)}
                       >
                         <span className="robot-dashboard__status-dot" />
@@ -668,4 +682,11 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
       </div>
     </PanelFrame>
   )
+}
+function CameraVideo({ stream }: { stream: MediaStream }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream
+  }, [stream])
+  return <video ref={videoRef} autoPlay playsInline muted />
 }

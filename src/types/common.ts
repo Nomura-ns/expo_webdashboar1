@@ -36,7 +36,7 @@ export type Vec2 = {
 }
 
 /** カメラの点検結果（正常/異常の2値） */
-export type CameraCheckStatus = '正常' | '異常'
+export type CameraCheckStatus = '運転' | '待機' | '停止' | '異常'
 
 /** カメラ映像1台分の状態 */
 export type CameraFeed = {

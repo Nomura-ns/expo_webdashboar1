@@ -1,6 +1,6 @@
 // config/operationMetricsAddresses.ts
 //
-// 稼働実績（検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数）と、
+// 稼働実績（検査回数・異常回数・上刃挿入回数・取付実行回数・取出実行回数）と、
 // サイクル変更タイミング用bit・サイクルタイム・NG判定信号のPLCアドレス定義。
 //
 // D レジスタの実アドレスはまだ未定のため、ここでは仮の番号を置いています。
@@ -13,9 +13,9 @@ export const INSPECT_COUNT_ADDRESS = 200
 export const ANOMALY_COUNT_ADDRESS = 201
 /** 上刃挿入回数 */
 export const INSERT_COUNT_ADDRESS = 202
-/** ねじ締め回数 */
+/** 取付実行回数 */
 export const TIGHTEN_COUNT_ADDRESS = 203
-/** ねじ緩め回数 */
+/** 取出実行回数 */
 export const LOOSEN_COUNT_ADDRESS = 204
 /** NG判定信号（0 = OK, 1 = NG） */
 export const NG_SIGNAL_ADDRESS = 205

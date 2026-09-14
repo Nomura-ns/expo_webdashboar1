@@ -6,10 +6,21 @@
 //
 // 表示・非表示の切替はOperationStatus.css側のメディアクエリで行う
 // （モニタ幅ではこの表を非表示、モバイル幅ではAxisRowのグリッド表示を非表示にする）。
+//
+// STATUS画面仕様変更（9. モバイル版簡略表示／10. モバイル版RB切替機能）対応：
+// ・ヘッダーを2段構成にし、「RB1」「RB2」のロボット名は列見出しに1回だけ表示、
+//   以降は色（rb1Color/rb2Color）で識別する（横スクロール発生時の繰り返し表示を削減）。
+// ・セル内表示は「現在値 / Peak値」形式に統一し、「ピーク」の文字表記は廃止した。
+// ・警告（しきい値80%到達〜70%以下で3秒維持して解除）はOperationStatus側の
+//   warningAxes（モニタ版のaxis-row--warningと共通のヒステリシス付き判定）を
+//   そのまま受け取る。仕様の最終イメージ「色は変化せずフリッカのみ」に合わせ、
+//   文字色は変えずに点滅のみで通知する（モニタ版と動作を統一）。
+// ・モバイルRB切替（タップした側を強調、もう一方を減光）に対応するため、
+//   selectedRBを受け取り、非選択側の列を減光表示する。
 
 import type { AxisRowData } from './AxisRow'
 import type { Theme } from '../../types'
-import { WARN_COLOR } from './robotColors'
+import type { RobotKey } from './OperationStatus'
 
 interface Props {
   rows: AxisRowData[]
@@ -17,44 +28,88 @@ interface Props {
   rb1Color: string
   rb2Color: string
   theme: Theme
+  /** 軸ごとの警告状態（モニタ版のaxis-row--warningと共通。省略時は全軸非警告扱い） */
+  warningAxes?: boolean[]
+  /** モバイルRB切替で選択中のロボット。nullなら両方とも通常表示 */
+  selectedRB?: RobotKey | null
 }
 
-export default function AxisTable({ rows, threshold, rb1Color, rb2Color, theme }: Props) {
+export default function AxisTable({
+  rows,
+  rb1Color,
+  rb2Color,
+  theme,
+  warningAxes = [],
+  selectedRB = null,
+}: Props) {
+  const DIM_OPACITY = 0.35
+  const rb1Dim = selectedRB === 'RB2'
+  const rb2Dim = selectedRB === 'RB1'
+
   return (
     <div className="axis-table-scroll">
       <table className="axis-table">
         <thead>
           <tr>
-            <th style={{ color: theme.subtext, borderColor: theme.border }}>軸</th>
-            <th style={{ color: rb1Color, borderColor: theme.border }}>RB1 速度</th>
-            <th style={{ color: rb1Color, borderColor: theme.border }}>RB1 トルク（ピーク）</th>
-            <th style={{ color: rb2Color, borderColor: theme.border }}>RB2 速度</th>
-            <th style={{ color: rb2Color, borderColor: theme.border }}>RB2 トルク（ピーク）</th>
+            <th rowSpan={2} style={{ color: theme.subtext, borderColor: theme.border }}>
+              軸
+            </th>
+            <th
+              colSpan={2}
+              className="axis-table__group-head"
+              style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}
+            >
+              RB1
+            </th>
+            <th
+              colSpan={2}
+              className="axis-table__group-head"
+              style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}
+            >
+              RB2
+            </th>
+          </tr>
+          <tr>
+            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
+              速度
+            </th>
+            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
+              トルク
+            </th>
+            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
+              速度
+            </th>
+            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
+              トルク
+            </th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
-            const rb1Warn = row.rb1.torquePeak >= threshold || row.rb1.speed >= threshold
-            const rb2Warn = row.rb2.torquePeak >= threshold || row.rb2.speed >= threshold
+            // 現在値/Peak値表記の「/」はモニタ版（TorqueBar）の表記と統一している
+            const isWarning = warningAxes[row.axis - 1] ?? false
             return (
               <tr key={row.axis}>
-                <td
-                  className="axis-table__label"
-                  style={{ color: theme.text, borderColor: theme.border }}
-                >
+                <td className="axis-table__label" style={{ color: theme.text, borderColor: theme.border }}>
                   {row.axisLabel ?? `軸${row.axis}`}
                 </td>
-                <td style={{ color: rb1Warn ? WARN_COLOR : theme.text, borderColor: theme.border }}>
+                <td style={{ color: theme.text, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
                   {row.rb1.speed}%
                 </td>
-                <td style={{ color: rb1Warn ? WARN_COLOR : theme.text, borderColor: theme.border }}>
-                  {row.rb1.torqueValue}%（ピーク{row.rb1.torquePeak}%）
+                <td
+                  className={isWarning ? 'axis-table__cell--warning' : undefined}
+                  style={{ color: theme.text, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}
+                >
+                  {row.rb1.torqueValue} / {row.rb1.torquePeak}
                 </td>
-                <td style={{ color: rb2Warn ? WARN_COLOR : theme.text, borderColor: theme.border }}>
+                <td style={{ color: theme.text, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
                   {row.rb2.speed}%
                 </td>
-                <td style={{ color: rb2Warn ? WARN_COLOR : theme.text, borderColor: theme.border }}>
-                  {row.rb2.torqueValue}%（ピーク{row.rb2.torquePeak}%）
+                <td
+                  className={isWarning ? 'axis-table__cell--warning' : undefined}
+                  style={{ color: theme.text, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}
+                >
+                  {row.rb2.torqueValue} / {row.rb2.torquePeak}
                 </td>
               </tr>
             )

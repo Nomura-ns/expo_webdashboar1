@@ -174,8 +174,8 @@ function ControlPreview({ theme }: { theme: Theme }) {
     { color: '#3fa9f5', h: 100 }, // 検査回数
     { color: '#ef5a5a', h: 3 },   // 異常回数
     { color: '#f2b544', h: 79 },  // 上刃挿入回数
-    { color: '#4fbf8f', h: 100 }, // ねじ締め回数
-    { color: '#b48be0', h: 97 },  // ねじ緩め回数
+    { color: '#4fbf8f', h: 100 }, // 取付実行回数
+    { color: '#b48be0', h: 97 },  // 取出実行回数
   ]
 
   return (
@@ -515,6 +515,8 @@ export default function Sidebar({
 
   // モバイル版：画面下部固定のコンパクトなタブバー
   if (isMobile) {
+    const mobilePages = PAGES.filter((page) => page.key !== 'dashboard')
+
     return (
       <nav style={{
         position: 'fixed',
@@ -528,7 +530,7 @@ export default function Sidebar({
         zIndex: 100,
         boxSizing: 'border-box',
       }}>
-        {PAGES.map(page => {
+        {mobilePages.map(page => {
           const isActive = currentPage === page.key
           return (
             <button

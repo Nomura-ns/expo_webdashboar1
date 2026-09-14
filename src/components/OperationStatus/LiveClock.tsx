@@ -23,5 +23,5 @@ export default function LiveClock() {
     return () => clearInterval(id)
   }, [])
 
-  return <span className="axis-monitor__clock">{format(now)}</span>
+  return <span className="app-header__clock">{format(now)}</span>
 }

@@ -5,15 +5,11 @@
 // side='right' はRB2（軸ラベル側=左に寄せて描画。値が増えるほど右へ伸びる）
 //
 // 変更点：
-// ・ピークが正常範囲内のときの目盛り線・ラベル色は、これまで未定義のCSS変数
-//   var(--text-secondary) 頼みで薄く見えることがあったため、mutedColorとして
-//   theme.subtextを外から渡せるようにした（省略時は従来のフォールバック色）
+// ・ピーク値の文字と目盛り線は、背景やRB2の橙色に埋もれない明るい黄色で表示する
 // ・バー内の数値ラベルは、編集パネルでRB1/RB2色を任意色に変更しても白文字の
 //   視認性が落ちないよう、OperationStatus.css側にtext-shadowを追加してある
 
 import type { CSSProperties } from 'react'
-import { WARN_COLOR } from './robotColors'
-
 interface Props {
   side: 'left' | 'right'
   value: number
@@ -24,15 +20,11 @@ interface Props {
   mutedColor?: string
 }
 
-const DEFAULT_MUTED_COLOR = 'var(--text-secondary, #8a97ac)'
-
 function pct(v: number) {
   return Math.min(100, Math.max(0, v))
 }
 
-export default function TorqueBar({ side, value, peak, color, threshold, mutedColor }: Props) {
-  const isWarn = peak >= threshold
-  const peakColor = isWarn ? WARN_COLOR : mutedColor ?? DEFAULT_MUTED_COLOR
+export default function TorqueBar({ side, value, peak, color }: Props) {
   const anchorProp = side === 'left' ? 'right' : 'left'
 
   const fillStyle: CSSProperties = {
@@ -43,24 +35,22 @@ export default function TorqueBar({ side, value, peak, color, threshold, mutedCo
   } as CSSProperties
 
   const peakStyle: CSSProperties = { [anchorProp]: `${pct(peak)}%` } as CSSProperties
-  const thresholdStyle: CSSProperties = { [anchorProp]: `${pct(threshold)}%` } as CSSProperties
+  const peakColor = '#ffeb3b'
+  const peakLineColor = peakColor
 
   return (
     <div className={`torque-bar torque-bar--${side}`}>
-      {/* しきい値の目安線（常時薄く表示） */}
-      <div className="torque-bar__threshold-tick" style={thresholdStyle} />
-
       <div className="torque-bar__track">
         <div className="torque-bar__fill" style={fillStyle}>
-          <span className="torque-bar__value">{value}%</span>
+          <span className="torque-bar__value">
+            {value}% /
+            <span className="torque-bar__peak-value" style={{ color: peakColor }}> {peak}%</span>
+          </span>
         </div>
       </div>
 
-      {/* ピーク目盛り線＋ラベル（バー上の余白内） */}
-      <div className="torque-bar__peak-tick" style={{ ...peakStyle, borderColor: peakColor }} />
-      <span className="torque-bar__peak-label" style={{ ...peakStyle, color: peakColor }}>
-        peak {peak}%
-      </span>
+      <div className="torque-bar__peak-tick" style={{ ...peakStyle, borderColor: peakLineColor }} />
+
     </div>
   )
 }

@@ -15,40 +15,33 @@
 }
 
 .flow-diagram-panel-title {
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700;
   font-family: var(--font-mono);
 }
 
 .flow-diagram-progress {
-  font-size: 13px;
+  font-size: 20px;
   font-family: var(--font-mono);
 }
 
 .flow-diagram-note {
-  font-size: 13px;
+  font-size: 20px;
   font-family: var(--font-mono);
 }
 
 /* ===== モニタ（52インチ等の大画面）向け：見出し・進捗文字を拡大 =====
-   768px超（モバイル以外）が対象。モバイルは現在工程のみの簡易表示のため元のサイズのまま */
+   768px超（モバイル以外）が対象。最低文字サイズ20px方針のため、モバイルも上のベース値(20px)を適用する */
 @media (min-width: 769px) {
   .flow-diagram-panel-title {
-    font-size: 18px;
+    font-size: 22px;
   }
   .flow-diagram-progress {
-    font-size: 15px;
+    font-size: 20px;
   }
   .flow-diagram-note {
-    font-size: 15px;
+    font-size: 20px;
   }
-}
-
-/* RB1／RB2フローを縦に並べる */
-.flow-robot-panels {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 /* SVGをそのままの大きさで描画し、はみ出した分は
@@ -65,6 +58,8 @@
 /* 各フローの枠（全体／RB1／RB2共通）。自動スライドで見せるため
    スクロールバー自体は隠す */
 .op-results__flow-scroll {
+  overflow-x: auto;
+  overflow-y: visible;
   scroll-behavior: smooth;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -77,9 +72,25 @@
    OVERALL_SIZING／ROBOT_SIZING／estimateNodeWidthの箱サイズと連動しているため、
    ここを変更する場合は必ずJS側の寸法も合わせて調整すること（被り防止） */
 .flow__label { font-size: 23px; font-family: var(--font-mono); }
-.flow__label--sm { font-size: 18px; font-family: var(--font-mono); }
+.flow__label--sm { font-size: 20px; font-family: var(--font-mono); }
 .flow__terminal-label { font-size: 20px; font-weight: 600; font-family: var(--font-mono); }
-.flow__branch-label { font-size: 17px; font-family: var(--font-mono); font-weight: 700; }
+.flow__branch-label { font-size: 20px; font-family: var(--font-mono); font-weight: 700; }
+
+/* 現在工程の強調／それ以外の暗め表示を滑らかに切り替える */
+.flow__node {
+  transition: opacity 0.35s ease;
+}
+
+/* 現在工程を指すポインター（三角アイコン）。工程移動時はJobFlowDiagram.tsx側のtransformで
+   左右にスライドしつつ、ここでは上下にゆっくり弾む動きを付けて視認性を上げる */
+.flow__pointer {
+  animation: flow-pointer-bounce 1.1s ease-in-out infinite;
+}
+
+@keyframes flow-pointer-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(4px); }
+}
 
 /* ===== モバイル用：現在工程のみのシンプル表示（フロー図の横スクロール代替） ===== */
 .flow-current-step {

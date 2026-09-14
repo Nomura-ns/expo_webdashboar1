@@ -40,25 +40,6 @@ const OVERALL_FLOW: FlowNodeDef[] = [
 ]
 const OVERALL_DECISION_STEP = OVERALL_FLOW.find((n) => n.id === 'ov-d')!.plcStep!
 
-// ── ②RB1フロー ────────────────────────────────────────────────
-const RB1_FLOW: FlowNodeDef[] = [
-  { id: 'rb1-s', kind: 'terminal', label: 'START' },
-  { id: 'rb1-1', kind: 'process', label: '下刃撮像', plcStep: 21 },
-  { id: 'rb1-2', kind: 'process', label: '上刃取付開始', plcStep: 22 },
-  { id: 'rb1-3', kind: 'process', label: '嵌合動作', plcStep: 23 },
-  { id: 'rb1-4', kind: 'process', label: '上刃位置確認', plcStep: 24 },
-  { id: 'rb1-d', kind: 'decision', label: '設定個数\n到達？', plcStep: 25 },
-  { id: 'rb1-e', kind: 'terminal', label: 'END' },
-]
-
-// ── ③RB2フロー ────────────────────────────────────────────────
-const RB2_FLOW: FlowNodeDef[] = [
-  { id: 'rb2-s', kind: 'terminal', label: 'START' },
-  { id: 'rb2-1', kind: 'process', label: 'ねじ締めを行う', plcStep: 31 },
-  { id: 'rb2-d', kind: 'decision', label: '設定個数\n到達？', plcStep: 32 },
-  { id: 'rb2-e', kind: 'terminal', label: 'END' },
-]
-
 /** 「n/m工程」の進捗を、plcStepを持つノードの数から計算する */
 function computeProgress(nodes: FlowNodeDef[], activeStep: number | undefined, totalOverride?: number) {
   const stepped = nodes.filter((n) => n.plcStep !== undefined)
@@ -135,21 +116,6 @@ const OVERALL_SIZING: SizingConfig = {
   lineHeight: 21,
 }
 
-const ROBOT_SIZING: SizingConfig = {
-  boxW: 168,
-  boxH: 66,
-  diamondW: 132,
-  diamondH: 100,
-  termW: 84,
-  termH: 44,
-  gapX: 44,
-  leftPad: 16,
-  rightPad: 16,
-  topPad: 22,
-  bottomPad: 22,
-  lineHeight: 20,
-}
-
 interface HorizontalPositioned {
   node: FlowNodeDef
   cx: number
@@ -197,15 +163,13 @@ interface FlowCanvasProps {
   activeStep?: number
   /** 判定確定後、指定ノードを色付きチップ表示に差し替える（全体フローのOK/NG用） */
   resolvedChip?: ResolvedChip
-  /** ひし形の直後の矢印に添えるラベル（RB1/RB2のYESなど） */
-  decisionForwardLabel?: string
   /** trueの場合、現在工程が常に見える位置へ自動スライドする */
   autoSlide?: boolean
   /** 枠の高さなどを個別指定するための追加クラス名 */
   scrollClassName?: string
 }
 
-function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChip, decisionForwardLabel, autoSlide, scrollClassName }: FlowCanvasProps) {
+function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChip, autoSlide, scrollClassName }: FlowCanvasProps) {
   const { positioned, totalW, totalH, rowCenterY } = layoutHorizontal(nodes, s)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -225,6 +189,10 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
 
   const isActive = (p: HorizontalPositioned) => p.node.plcStep !== undefined && activeStep !== undefined && p.node.plcStep === activeStep
 
+  /** 現在工程が判明している間だけ、それ以外のノードを暗め表示にする（仕様書：現在工程を強調、それ以外は暗め） */
+  const hasActive = activeStep !== undefined
+  const nodeOpacity = (active: boolean) => (!hasActive || active ? 1 : 0.4)
+
   const renderLines = (p: HorizontalPositioned, cx: number, labelClass: string, fill: string) => {
     const lineDy = s.lineHeight
     const startDy = -((p.lines.length - 1) * lineDy) / 2
@@ -243,7 +211,7 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
     const y = rowCenterY - p.height / 4
     const h = p.height / 2
     return (
-      <g key={p.node.id} className="flow__node">
+      <g key={p.node.id} className="flow__node" opacity={nodeOpacity(true)}>
         <rect x={p.left} y={y} width={p.width} height={h} rx={h / 2} fill={chip.color} />
         <text x={p.cx} y={y + h / 2} dominantBaseline="middle" textAnchor="middle" className="flow__terminal-label" fill="#fff">
           {chip.label}
@@ -265,7 +233,7 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
       .map((pt) => pt.join(','))
       .join(' ')
     return (
-      <g key={p.node.id} className={groupClass}>
+      <g key={p.node.id} className={groupClass} opacity={nodeOpacity(active)}>
         {active && <polygon className="flow__active-glow" points={points} fill="none" stroke={theme.accent} strokeWidth={9} />}
         <polygon points={points} fill={theme.surface} stroke={strokeColor} strokeWidth={active ? 3 : 1.5} />
         {renderLines(p, p.cx, 'flow__label flow__label--sm', theme.subtext)}
@@ -280,7 +248,7 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
     const y = rowCenterY - p.height / 2
     const rx = p.height / 2
     return (
-      <g key={p.node.id} className={groupClass}>
+      <g key={p.node.id} className={groupClass} opacity={nodeOpacity(active)}>
         <rect x={p.left} y={y} width={p.width} height={p.height} rx={rx} fill={theme.surface} stroke={strokeColor} strokeWidth={active ? 3 : 1.5} />
         <text x={p.cx} y={rowCenterY} dominantBaseline="middle" textAnchor="middle" className="flow__terminal-label" fill={theme.subtext}>
           {p.node.label}
@@ -297,7 +265,7 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
     const y = rowCenterY - p.height / 2
 
     return (
-      <g key={p.node.id} className={groupClass}>
+      <g key={p.node.id} className={groupClass} opacity={nodeOpacity(active)}>
         {active && (
           <rect
             className="flow__active-glow"
@@ -325,8 +293,6 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
     return renderBox(p)
   }
 
-  const decisionIdx = positioned.findIndex((p) => p.node.kind === 'decision' && !(resolvedChip && p.node.id === resolvedChip.nodeId))
-
   return (
     <div
       className={`op-results__flow-scroll${scrollClassName ? ` ${scrollClassName}` : ''}`}
@@ -353,16 +319,17 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
               markerEnd={`url(#${markerId})`}
             />
           ))}
-          {decisionForwardLabel && decisionIdx >= 0 && decisionIdx + 1 < positioned.length && (
-            <text
-              x={(positioned[decisionIdx].right + positioned[decisionIdx + 1].left) / 2}
-              y={rowCenterY - 15} 
-              textAnchor="middle"
-              className="flow__branch-label"
-              fill={OK_COLOR}
+          {/* 現在工程を指すポインター。工程が進むとtransformのtransitionでスライド移動する
+              （仕様書：フロー上を移動するポインター／工程移動時は滑らかに遷移） */}
+          {focusTarget && (
+            <g
+              style={{ transition: 'transform 0.5s ease' }}
+              transform={`translate(${focusTarget.cx}, ${rowCenterY - focusTarget.height / 2 - 14})`}
             >
-              {decisionForwardLabel}
-            </text>
+              <g className="flow__pointer">
+                <path d="M0,-2 L-8,-16 L8,-16 Z" fill={theme.accent} />
+              </g>
+            </g>
           )}
         </svg>
       </div>
@@ -469,7 +436,7 @@ interface JobFlowDiagramProps {
   ngSignal?: boolean
 }
 
-/** 全体フロー図（自動スライド方式・枠で囲んだ表示）。RB1／RB2は RobotFlows を使用してください。
+/** 全体フロー図（自動スライド方式・枠で囲んだ表示）。RB1／RB2フローは改修仕様書により廃止済み。
  *  モバイルでは横スクロールのフロー図自体が不要なため、現在工程のみを表示する簡易ビューに切り替える。 */
 export default function JobFlowDiagram({ theme, activeStep, ngSignal }: JobFlowDiagramProps) {
   const isMobile = useIsMobile()
@@ -478,11 +445,11 @@ export default function JobFlowDiagram({ theme, activeStep, ngSignal }: JobFlowD
 
   if (isMobile) {
     const current = findCurrentStep(nodes, activeStep, resolvedChip)
-    return <CurrentStepView theme={theme} title="全体フロー" progress={progress} current={current} />
+    return <CurrentStepView theme={theme} title=" " progress={progress} current={current} />
   }
 
   return (
-    <FlowPanel theme={theme} title="全体フロー" progress={progress}>
+    <FlowPanel theme={theme} title=" " progress={progress}>
       <FlowCanvas
         theme={theme}
         nodes={nodes}
@@ -494,59 +461,5 @@ export default function JobFlowDiagram({ theme, activeStep, ngSignal }: JobFlowD
         scrollClassName="op-results__flow-scroll--overall"
       />
     </FlowPanel>
-  )
-}
-
-/** RB1／RB2フロー。全体フローと同じ矩形・ひし形・端子の形状を用い、それぞれ枠で囲んで表示する。
- *  モバイルでは横スクロールが不要なため、各ロボットの現在工程のみを表示する。 */
-export function RobotFlows({ theme, activeStep }: { theme: Theme; activeStep?: number }) {
-  const isMobile = useIsMobile()
-  const rb1Progress = computeProgress(RB1_FLOW, activeStep)
-  const rb2Progress = computeProgress(RB2_FLOW, activeStep)
-
-  if (isMobile) {
-    const rb1Current = findCurrentStep(RB1_FLOW, activeStep)
-    const rb2Current = findCurrentStep(RB2_FLOW, activeStep)
-    return (
-      <div className="flow-robot-panels">
-        <CurrentStepView theme={theme} title="RB1フロー" progress={rb1Progress} current={rb1Current} />
-        <CurrentStepView theme={theme} title="RB2フロー" progress={rb2Progress} current={rb2Current} />
-      </div>
-    )
-  }
-
-  return (
-    <div className="flow-robot-panels">
-      <FlowPanel theme={theme} title="RB1フロー" progress={rb1Progress}>
-        <FlowCanvas
-          theme={theme}
-          nodes={RB1_FLOW}
-          sizing={ROBOT_SIZING}
-          markerId="flow-arrow-rb1"
-          activeStep={activeStep}
-          decisionForwardLabel="YES"
-          autoSlide
-          scrollClassName="op-results__flow-scroll--robot"
-        />
-        <div className="flow-diagram-note" style={{ color: NG_COLOR }}>
-          NO時は再度「下刃撮像」へ
-        </div>
-      </FlowPanel>
-      <FlowPanel theme={theme} title="RB2フロー" progress={rb2Progress}>
-        <FlowCanvas
-          theme={theme}
-          nodes={RB2_FLOW}
-          sizing={ROBOT_SIZING}
-          markerId="flow-arrow-rb2"
-          activeStep={activeStep}
-          decisionForwardLabel="YES"
-          autoSlide
-          scrollClassName="op-results__flow-scroll--robot"
-        />
-        <div className="flow-diagram-note" style={{ color: NG_COLOR }}>
-          NO時は再度「ねじ締めを行う」へ
-        </div>
-      </FlowPanel>
-    </div>
   )
 }

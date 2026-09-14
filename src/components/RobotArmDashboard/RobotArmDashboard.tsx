@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Theme } from '../../types'
-import type { UIEvent } from 'react'
 import PanelFrame from '../common/PanelFrame'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import type {CameraFeed } from '../../types/common'
@@ -10,6 +9,7 @@ type Props = {
   theme: Theme
   isEditing: boolean
   onEditingChange: (value: boolean) => void
+  plcStatusById?: Record<string, CameraStatus> 
 }
 
 // 背景色（theme.bg）が明るい色かどうかを簡易判定
@@ -34,11 +34,27 @@ const ROTATE_INTERVAL_MS = 6000
 const CLOCK_INTERVAL_MS = 1000
 
 // カメラの状態は正常 / 異常の2値で管理する
-type CameraStatus = '正常' | '異常'
+type CameraStatus = '運転' | '異常' | '待機' |'停止'
 
 // 異常時の枠色。ダーク系テーマ / ライト系テーマそれぞれの「赤」に寄せて出し分ける
 const ABNORMAL_COLOR_DARK = '#ff4d4f'
 const ABNORMAL_COLOR_LIGHT = '#c81e1e'
+
+
+/*const STANDBY_COLOR = '#f0ad4e' // 待機：アンバー
+const getStatusColor = (status: CameraStatus, theme: Theme, abnormalColor: string) => {
+  switch (status) {
+    case '異常':
+      return abnormalColor
+    case '待機':
+      return STANDBY_COLOR
+    case '停止':
+      return theme.subtext
+    case '運転':
+    default:
+      return theme.accent
+  }
+}*/
 
 const createInitialCameras = (): CameraFeed[] => [
   {
@@ -47,7 +63,7 @@ const createInitialCameras = (): CameraFeed[] => [
     location: '正面',
     pos: { x: 25, y: 50 },
     size: 800,
-    status: '正常',
+    status: '運転',
     completedSteps: 0,
     totalSteps: 5,
   },
@@ -57,7 +73,7 @@ const createInitialCameras = (): CameraFeed[] => [
     location: '背面',
     pos: { x: 75, y: 50 },
     size: 800,
-    status: '正常',
+    status: '運転',
     completedSteps: 0,
     totalSteps: 5,
   },
@@ -72,14 +88,13 @@ const nextCameraDefaults = (index: number): CameraFeed => ({
     y: 50 + (Math.random() * 20 - 10),
   },
   size: 320,
-  status: '正常',
+  status: '運転',
   completedSteps: 0,
   totalSteps: 5,
 })
 
-export default function RobotArmDashboard({ theme, isEditing, onEditingChange }: Props) {
+export default function RobotArmDashboard({ theme, isEditing, onEditingChange, plcStatusById }: Props) {
   const isMobile = useIsMobile()
-  const mobileScrollerRef = useRef<HTMLDivElement>(null)
 
   const [cameras, setCameras] = useState<CameraFeed[]>(createInitialCameras())
   const [countInput, setCountInput] = useState(String(cameras.length))
@@ -89,7 +104,6 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
 
   // --- モバイル：現在表示中のカメラ（タブ切替・横スクロール切替と連動） ---
   const [activeCameraIndex, setActiveCameraIndex] = useState(0)
-  const isScrollingBySelf = useRef(false)
   // モバイルで「直前に自動切替した異常カメラID」を覚えておき、同じ異常が続く間は再度奪わない
   const prevAutoAbnormalId = useRef<string | null>(null)
 
@@ -114,6 +128,22 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
   useEffect(() => {
     setCountInput(String(cameras.length))
   }, [cameras.length])
+
+    // カメラ台数が外部要因（±ボタン等）で変わったら入力欄の表示も同期する
+  useEffect(() => {
+    setCountInput(String(cameras.length))
+  }, [cameras.length])
+
+  // ↓ ここから追加：PLCから状態が届いたら反映
+  useEffect(() => {
+  if (!plcStatusById) return
+  setCameras(prev =>
+    prev.map(cam => {
+      const next = plcStatusById[cam.id]
+      return next && next !== cam.status ? { ...cam, status: next } : cam
+    })
+  )
+}, [plcStatusById])
 
   const canvasBg = isLightColor(theme.bg) ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.14)'
   const abnormalColor = isLightColor(theme.bg) ? ABNORMAL_COLOR_LIGHT : ABNORMAL_COLOR_DARK
@@ -145,18 +175,9 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
   // --- モバイル：ステータスボックスに表示する「現在タブのカメラ」 ---
   const activeCamera = cameras[clampedActiveIndex] ?? cameras[0]
 
-  // --- モバイル：タブクリック → 該当ページへスクロール ---
+  // --- モバイル：タブクリック → 表示カメラを切り替え ---
   const scrollToCameraIndex = (index: number) => {
     setActiveCameraIndex(index)
-  }
-
-  // --- モバイル：横スクロールでページが変わったらタブも追従させる ---
-  const handleMobileScroll = (e: UIEvent<HTMLDivElement>) => {
-    if (isScrollingBySelf.current) return
-    const el = e.currentTarget
-    if (el.clientWidth === 0) return
-    const index = Math.round(el.scrollLeft / el.clientWidth)
-    setActiveCameraIndex(prev => (prev === index ? prev : index))
   }
 
   // --- モバイル：異常が発生したカメラを自動優先表示する（時間による自動切替は行わない） ---
@@ -216,19 +237,25 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
     setCameras(prev => prev.map(cam => (cam.id === id ? { ...cam, ...patch } : cam)))
   }
 
-  const toggleStatus = (id: string) => {
-    setCameras(prev =>
-      prev.map(cam =>
-        cam.id === id
-          ? { ...cam, status: (cam.status === '正常' ? '異常' : '正常') as CameraStatus }
-          : cam
-      )
-    )
-  }
 
   const deleteCamera = (id: string) => {
     setCameras(prev => (prev.length > MIN_CAMERAS ? prev.filter(cam => cam.id !== id) : prev))
   }
+
+  // ↓ ここから追加：未定義だった toggleStatus を実装（テスト用・4値サイクル）
+  const STATUS_CYCLE: CameraStatus[] = ['運転', '待機', '停止', '異常']
+
+  const toggleStatus = (id: string) => {
+  setCameras(prev =>
+    prev.map(cam => {
+      if (cam.id !== id) return cam
+      const current = cam.status ?? '運転'
+      const idx = STATUS_CYCLE.indexOf(current)
+      const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length] as CameraStatus
+      return { ...cam, status: next }
+    })
+  )
+}
 
   // --- 完了工程（PLCから工程完了/開始のたびに信号が来るイメージのテスト操作） ---
   const adjustCompletedSteps = (id: string, delta: number) => {
@@ -256,44 +283,31 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
 
   // --- カメラ枠の中身（画像 / プレースホルダー / オーバーレイ）はデスクトップ・モバイル・分割表示で共通 ---
   const renderCameraContent = (cam: CameraFeed) => {
-    const isAbnormal = cam.status === '異常'
-    return (
-      <>
-        {cam.imageUrl ? (
-          <img src={cam.imageUrl} alt={cam.label} draggable={false} />
-        ) : (
-          <div className="robot-dashboard__camera-placeholder">NO SIGNAL</div>
-        )}
-        <div className="robot-dashboard__camera-scanline" />
-        <div className="robot-dashboard__camera-overlay">
-          <div className="robot-dashboard__camera-overlay-top">
-            <span className="robot-dashboard__camera-label">{cam.label}</span>
-            <span className={`robot-dashboard__status-badge${isAbnormal ? ' is-abnormal' : ' is-normal'}`}>
-              <span className="robot-dashboard__status-dot" />
-              {cam.status}
+  return (
+    <>
+      {cam.imageUrl ? (
+        <img src={cam.imageUrl} alt={cam.label} draggable={false} />
+      ) : (
+        <div className="robot-dashboard__camera-placeholder">NO SIGNAL</div>
+      )}
+      <div className="robot-dashboard__camera-scanline" />
+      <div className="robot-dashboard__camera-overlay">
+        <div className="robot-dashboard__camera-overlay-bottom">
+          <div className="robot-dashboard__camera-meta">
+            <span className="robot-dashboard__camera-clock">{timeLabel}</span>
+            <span className="robot-dashboard__camera-rec">
+              <span className="robot-dashboard__camera-rec-dot" />
+              REC
             </span>
           </div>
-          <div className="robot-dashboard__camera-overlay-bottom">
-            {cam.location ? (
-              <span className="robot-dashboard__camera-location">撮影箇所: {cam.location}</span>
-            ) : (
-              <span />
-            )}
-            <div className="robot-dashboard__camera-meta">
-              <span className="robot-dashboard__camera-clock">{timeLabel}</span>
-              <span className="robot-dashboard__camera-rec">
-                <span className="robot-dashboard__camera-rec-dot" />
-                REC
-              </span>
-            </div>
-          </div>
         </div>
-      </>
-    )
-  }
+      </div>
+    </>
+  )
+}
 
   return (
-    <PanelFrame className="robot-dashboard" reserveForQr>
+    <PanelFrame className="robot-dashboard">
       <div
         className={`robot-dashboard__body${isEditing ? ' is-editing' : ''}`}
         style={{ '--canvas-bg': canvasBg, '--abnormal-color': abnormalColor } as React.CSSProperties}
@@ -383,18 +397,6 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange }:
           /* --- デスクトップ版：ステータスカード + メインカメラモニター --- */
           <div className="robot-dashboard__monitor">
             <div className="robot-dashboard__status-row">
-              <div
-                className="robot-dashboard__run-card"
-                style={{ background: theme.headerBg, borderColor: theme.border }}
-              >
-                <span
-                  className="robot-dashboard__run-label"
-                  style={{ color: isRunning ? theme.accent : theme.subtext }}
-                >
-                  {isRunning ? '運転中' : '停止中'}
-                </span>
-              </div>
-
               {cameras.map(cam => {
                 const isAbnormal = cam.status === '異常'
                 return (

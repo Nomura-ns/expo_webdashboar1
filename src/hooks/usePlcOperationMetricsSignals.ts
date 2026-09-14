@@ -25,9 +25,9 @@ export interface PlcOperationMetrics {
   anomalyCount: number
   /** 上刃挿入回数 */
   insertCount: number
-  /** ねじ締め回数 */
+  /** 取付実行回数 */
   tightenCount: number
-  /** ねじ緩め回数 */
+  /** 取出実行回数 */
   loosenCount: number
   /** NG判定信号（true = NG） */
   ngSignal: boolean

@@ -9,8 +9,6 @@
 // このコンポーネント自体は現状どこからも呼ばれていない。将来グリッド表示に
 // 戻す場合のために残してある。
 
-import SemiGauge from './SemiGauge'
-import { RB1_COLOR, RB2_COLOR } from './robotColors'
 
 export interface AxisSpeedRow {
   axis: number
@@ -39,10 +37,6 @@ export default function SpeedGaugeGrid({ data, threshold }: Props) {
                 軸{row.axis}
                 {warn && <span className="speed-gauge-card__warn">!</span>}
               </div>
-              <div className="speed-gauge-card__gauges">
-                <SemiGauge value={row.rb1} color={RB1_COLOR} label="R1" />
-                <SemiGauge value={row.rb2} color={RB2_COLOR} label="R2" />
-              </div>
             </div>
           )
         })}
@@ -51,4 +45,4 @@ export default function SpeedGaugeGrid({ data, threshold }: Props) {
   )
 }
 
-export { TRACK_COLOR }
+

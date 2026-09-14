@@ -1,13 +1,13 @@
 // OperationStatus.tsx
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PanelFrame from '../common/PanelFrame'
 import type { Theme } from '../../types'
 
 import RobotHeaderBadge from './RobotHeaderBadge'
 import AxisRow, { type AxisRowData } from './AxisRow'
 import AxisTable from './AxisTable'
-import LiveClock from './LiveClock'
-import { RB1_COLOR, RB2_COLOR, WARN_COLOR } from './robotColors'
+import AverageSpeedGauge from './AverageSpeedGauge'
+import { RB1_COLOR, RB2_COLOR } from './robotColors'
 
 import './OperationStatus.css'
 
@@ -39,6 +39,8 @@ interface OperationStatusProps {
 
 // しきい値（トルク・速度どちらも同じ%で判定）
 const THRESHOLD = 80
+const WARNING_RELEASE_THRESHOLD = 70
+const WARNING_RELEASE_DELAY_MS = 3000
 
 export default function OperationStatus({
   theme,
@@ -82,41 +84,84 @@ export default function OperationStatus({
     },
   }))
 
+  const [warningAxes, setWarningAxes] = useState<boolean[]>(() => Array(axisCount).fill(false))
+  const releaseTimersRef = useRef<Array<number | undefined>>([])
+  const latestRowsRef = useRef(axisRows)
+  latestRowsRef.current = axisRows
+
+  useEffect(() => {
+    setWarningAxes((previous) => {
+      const next = Array.from({ length: axisCount }, (_, i) => previous[i] ?? false)
+      let changed = false
+
+      next.forEach((isWarning, index) => {
+        const row = axisRows[index]
+        if (!row) return
+        const values = [
+          row.rb1.torqueValue,
+          row.rb2.torqueValue,
+        ]
+        const reachedWarning = values.some((value) => value >= THRESHOLD)
+        const belowReleaseThreshold = values.every((value) => value <= WARNING_RELEASE_THRESHOLD)
+
+        if (reachedWarning) {
+          if (releaseTimersRef.current[index] !== undefined) {
+            window.clearTimeout(releaseTimersRef.current[index])
+            releaseTimersRef.current[index] = undefined
+          }
+          if (!isWarning) {
+            next[index] = true
+            changed = true
+          }
+        } else if (isWarning && belowReleaseThreshold && releaseTimersRef.current[index] === undefined) {
+          releaseTimersRef.current[index] = window.setTimeout(() => {
+            const latest = latestRowsRef.current[index]
+            if (!latest) return
+            const latestValues = [
+              latest.rb1.torqueValue,
+              latest.rb2.torqueValue,
+            ]
+            if (latestValues.every((value) => value <= WARNING_RELEASE_THRESHOLD)) {
+              setWarningAxes((current) => {
+                const released = [...current]
+                released[index] = false
+                return released
+              })
+            }
+            releaseTimersRef.current[index] = undefined
+          }, WARNING_RELEASE_DELAY_MS)
+        }
+      })
+
+      return changed ? next : previous
+    })
+  }, [axisCount, axisRows])
+
+  useEffect(() => () => {
+    releaseTimersRef.current.forEach((timer) => {
+      if (timer !== undefined) window.clearTimeout(timer)
+    })
+  }, [])
+
+  // 6軸平均速度（速度%のみの平均。トルクは含めない）。履歴は持たず現在値のみを
+  // ガラス調ゲージで表示する（各トルクグラフ群の直上・モニタ版のみ）
+  const rb1AvgSpeed = axisRows.reduce((sum, r) => sum + r.rb1.speed, 0) / axisRows.length
+  const rb2AvgSpeed = axisRows.reduce((sum, r) => sum + r.rb2.speed, 0) / axisRows.length
+
+  // モバイルRB切替：タップした側を強調、もう一方を減光する（AxisTable側で減光処理）
+  const [selectedMobileRB, setSelectedMobileRB] = useState<RobotKey | null>(null)
+  const handleMobileRBToggle = (rb: RobotKey) => {
+    setSelectedMobileRB((prev) => (prev === rb ? null : rb))
+  }
+
   return (
-    <PanelFrame className={`op-status op-status--${theme}`} reserveForQr>
+    <PanelFrame className={`op-status op-status--${theme}`}>
       <div className="axis-monitor">
         <div className="axis-monitor__body">
           <div className="axis-monitor__main-col">
-            {/* 上部タイトルバー：タイトル・単位/凡例・現在時刻 */}
-            <div className="axis-monitor__topbar" style={{ borderBottomColor: theme.border }}>
-              <div className="axis-monitor__title" style={{ color: theme.text }}>
-                軸モニタ ー RB1 / RB2 比較
-              </div>
-              <div className="axis-monitor__unit" style={{ color: theme.subtext }}>
-                トルク：定格トルク比 % ／ 速度：MAX比 %
-              </div>
-              <div className="axis-monitor__legend">
-                <span
-                  className="axis-monitor__legend-item axis-monitor__legend-item--peak"
-                  style={{ color: theme.subtext }}
-                >
-                  <i style={{ borderColor: theme.subtext }} />
-                  ピーク値
-                </span>
-                <span
-                  className="axis-monitor__legend-item axis-monitor__legend-item--threshold"
-                  style={{ color: theme.subtext }}
-                >
-                  <i style={{ borderColor: WARN_COLOR }} />
-                  しきい値近接（{THRESHOLD}%〜）
-                </span>
-              </div>
-              <LiveClock />
-            </div>
-
-            {/* RB1/RB2の稼働率バッジ＋中央見出し
-               ※稼働率バッジは、それぞれRB1/RB2の速度ゲージの列（左端／右端）の真上に
-                 くるようgrid-columnで明示的に位置合わせしている（従来は中央寄りにずれていた） */}
+            {/* RB1/RB2ラベルは枠付きの箱(boxed)に変更し、縦に間延びさせず
+               同じ行の隣に平均速度ゲージを並べる（旧・speed-gauge-rowはここに統合）。
+               中央列にはトルクバー群の見出しとなる「トルク」バッジを配置する。 */}
             <div className="axis-monitor__header-row">
               <div className="axis-monitor__header-rb1">
                 <RobotHeaderBadge
@@ -125,31 +170,57 @@ export default function OperationStatus({
                   color={rb1Color}
                   utilizationRate={robotRB1.utilizationRate}
                   align="left"
-                  layout="stacked"
+                  layout="boxed"
                   textColor={rb1Color}
                   captionColor={theme.subtext}
                 />
+                <AverageSpeedGauge value={rb1AvgSpeed} color={rb1Color} label="平均速度" />
               </div>
+
               <div className="axis-monitor__header-center">
-                <div className="axis-monitor__header-center-title" style={{ color: theme.text }}>
-                  軸別
-                </div>
-                <div className="axis-monitor__header-center-caption" style={{ color: theme.subtext }}>
-                  トルク・速度
+                <div
+                  className="axis-monitor__torque-badge"
+                  style={{ borderColor: `${theme.text}55`, color: theme.text }}
+                >
+                  <svg
+                    className="axis-monitor__torque-badge-icon"
+                    viewBox="0 0 24 24"
+                    width="22"
+                    height="22"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 3 L12 21" />
+                    <path d="M8 7 L12 3 L16 7" />
+                    <path d="M8 17 L12 21 L16 17" />
+                  </svg>
+                  トルク
                 </div>
               </div>
+
               <div className="axis-monitor__header-rb2">
+                <AverageSpeedGauge value={rb2AvgSpeed} color={rb2Color} label="平均速度" />
                 <RobotHeaderBadge
                   label="RB2"
                   colorKey="RB2"
                   color={rb2Color}
                   utilizationRate={robotRB2.utilizationRate}
                   align="right"
-                  layout="stacked"
+                  layout="boxed"
                   textColor={rb2Color}
                   captionColor={theme.subtext}
                 />
               </div>
+            </div>
+
+            {/* 「速度」の文字は各軸行で繰り返さず、ここで1か所だけ表示する
+               （RB1側＝1列目／RB2側＝5列目。軸ごとのSpeedBarはアイコンのみ） */}
+            <div className="axis-monitor__speed-caption-row">
+              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb1">速度</span>
+              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb2">速度</span>
             </div>
 
             {/* 軸1〜6：モニタ表示（グリッド＋ゲージ）。モバイル幅ではCSSで非表示にする */}
@@ -159,6 +230,7 @@ export default function OperationStatus({
                   key={row.axis}
                   data={row}
                   threshold={THRESHOLD}
+                  isWarning={warningAxes[row.axis - 1] ?? false}
                   rb1Color={rb1Color}
                   rb2Color={rb2Color}
                   theme={theme}
@@ -168,23 +240,37 @@ export default function OperationStatus({
 
             {/* モバイル表示：グラフ／ゲージの代わりに表形式（横スクロール可）。
                モニタ幅ではCSSで非表示にする */}
+            {/* RB1/RB2切替トグル（モバイル幅のみCSSで表示）。押した側を強調、
+               もう一方をAxisTable側で減光表示する */}
+            <div className="axis-monitor__mobile-rb-toggle">
+              <button
+                type="button"
+                className={`axis-monitor__mobile-rb-btn${selectedMobileRB === 'RB1' ? ' axis-monitor__mobile-rb-btn--active' : ''}`}
+                style={{ borderColor: rb1Color, color: rb1Color }}
+                onClick={() => handleMobileRBToggle('RB1')}
+              >
+                RB1
+              </button>
+              <button
+                type="button"
+                className={`axis-monitor__mobile-rb-btn${selectedMobileRB === 'RB2' ? ' axis-monitor__mobile-rb-btn--active' : ''}`}
+                style={{ borderColor: rb2Color, color: rb2Color }}
+                onClick={() => handleMobileRBToggle('RB2')}
+              >
+                RB2
+              </button>
+            </div>
+
             <AxisTable
               rows={axisRows}
               threshold={THRESHOLD}
               rb1Color={rb1Color}
               rb2Color={rb2Color}
               theme={theme}
+              warningAxes={warningAxes}
+              selectedRB={selectedMobileRB}
             />
 
-            {/* 下部の補足 */}
-            <div
-              className="axis-monitor__footer"
-              style={{ borderTopColor: theme.border, color: theme.subtext }}
-            >
-              <span>棒グラフ：現在トルク%（内側＝軸ラベル側が現在値）</span>
-              <span>異常しきい値{THRESHOLD}%を超えると赤破線に接近</span>
-              <span>データ更新：現場PLC同期</span>
-            </div>
           </div>
 
           {/* 編集パネル：RB1/RB2カラーと軸名を変更可能（モニタ・モバイル共通） */}

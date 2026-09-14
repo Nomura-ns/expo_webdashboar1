@@ -8,6 +8,7 @@ import OperationResults, { type MetricPoint } from './components/OperationResult
 import RobotArmDashboard from './components/RobotArmDashboard/RobotArmDashboard'
 import OperationStatus from './components/OperationStatus/OperationStatus'
 import NameplateQuiz from './components/NameplateQuiz/NameplateQuiz'
+import LiveClock from './components/OperationStatus/LiveClock'
 import { usePlcWebSocket } from './hooks/usePlcWebSocket' 
 import { useIsMobile } from './hooks/useMediaQuery'
 import { usePlcJobFlowSignals, JOB_FLOW_STEP_ADDRESS, JOB_FLOW_CYCLE_CURRENT_ADDRESS, JOB_FLOW_CYCLE_TOTAL_ADDRESS,} from './hooks/usePlcJobFlowSignals'
@@ -19,7 +20,7 @@ import { getRecentDates, METRIC_DAYS } from './utils/dateRange'
 
 // 稼働状況（anomalyページ）用のサンプルデータ
 // RB1・RB2は同一機種のため、画像は1枚を共通で使用する
-const SHARED_ROBOT_IMAGE_URL = '/TEST.png'
+const SHARED_ROBOT_IMAGE_URL = '/NS-Q3.png'
 
 // 速度はPLC対象外のためサンプル値のまま。トルク・ピーク値・稼働率はPLC(Dレジスタ、未定)から取得予定で、
 // アドレス確定までのフォールバックとしてここに仮の値を置いている（config/robotStatusAddresses.ts 参照）
@@ -145,12 +146,15 @@ export default function App() {
   const settingsRef = useRef<HTMLDivElement>(null)
   const gearBtnRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
-  const footerRef = useRef<HTMLElement>(null)
   const mode = getThemeMode(themeKey)
   const isMobile = useIsMobile()
-  // QRコードは3画面（dashboard/control/anomaly）で共通のため、各コンポーネント側では持たず
-  // ここで一箇所だけ描画する。モバイル版・銘板ページ（quiz）では表示しない
-  const showQrCode = !isMobile && currentPage !== 'quiz'
+
+  // モバイル版ではMONITOR画面を使わず、ROBOT PERFORMANCEを初期画面にする
+  useEffect(() => {
+    if (isMobile && currentPage === 'dashboard') {
+      setCurrentPage('control')
+    }
+  }, [isMobile, currentPage])
 
   // --- アイドル検知（モバイル版のみ：30分間ユーザー操作が無ければPLC接続を切る） ---
   // モニタ版は展示会場で常時つけっぱなし運用のため、絶対に接続を切ってはいけない。
@@ -308,27 +312,6 @@ export default function App() {
   )
   }, [sidebarOpen])
 
-  // footerの実高さを --footer-h に反映する。
-  // QR(.app-qr)はfooterより上に浮かせて表示する必要があるため、
-  // headerと同様にResizeObserverで実測し、ハードコードの30pxに依存しないようにする。
-  useEffect(() => {
-    if (!footerRef.current) return
-    const el = footerRef.current
-    const update = () => {
-      // footerはCSSで display:none になる場合(モバイル)は offsetHeight が0になる。
-      // QR自体もモバイルでは非表示なので、0で問題ない。
-      document.documentElement.style.setProperty('--footer-h', `${el.offsetHeight}px`)
-    }
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(el)
-    window.addEventListener('resize', update)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', update)
-    }
-  }, [])
-
   return (
     <div
       style={{
@@ -380,6 +363,7 @@ export default function App() {
         onMouseEnter={() => setIsGearHover(true)}
         onMouseLeave={() => setIsGearHover(false)}
        >
+      {!isMobile && <LiveClock />}
        <button
          onClick={(e) => {
           e.stopPropagation()
@@ -449,11 +433,6 @@ export default function App() {
           footerHeight={30}
         />
 
-        {/* QRコード（dashboard/control/anomalyの3画面で共通。パネルフレームの外＝この階層で1回だけ描画する） */}
-        {showQrCode && (
-          <img src={theme.qr} alt="QRコード" className="app-qr" />
-        )}
-
         {/* アイドル状態の通知（30分操作が無く接続を切っている間だけ表示。画面に触れると自動復帰） */}
         {isIdle && (
           <div
@@ -499,9 +478,9 @@ export default function App() {
            isEditing={isEditing}
            activeStep={activeStep}
            overallCycleTimeSec={cycleTimeSec}
-           rb1CycleTimeSec={cycleTimeSec}
-           rb2CycleTimeSec={cycleTimeSec}
            ngSignal={ngSignal}
+           // 刃物画像：RB1/RB2で共通のためSHARED_ROBOT_IMAGE_URLを流用（実画像が別途決まれば差し替え）
+           bladeImageUrl={SHARED_ROBOT_IMAGE_URL}
            onEditingChange={setIsEditing}
          />
        </div>
@@ -531,7 +510,6 @@ export default function App() {
         </div>
       </div>
       <footer
-        ref={footerRef}
         className="app-footer"
         style={{
           position: 'fixed',      

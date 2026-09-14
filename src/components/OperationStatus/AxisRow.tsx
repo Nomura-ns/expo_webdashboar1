@@ -13,7 +13,7 @@
 
 import TorqueBar from './TorqueBar'
 import SpeedBar from './SpeedBar'
-import { RB1_COLOR, RB2_COLOR } from './robotColors'
+import { RB1_COLOR, RB2_COLOR, WARN_COLOR } from './robotColors'
 import type { Theme } from '../../types'
 
 export interface AxisRowData {
@@ -33,6 +33,8 @@ interface Props {
   rb2Color?: string
   /** 文字色をtheme色に揃えるために使用 */
   theme?: Theme
+  /** 80%でON、70%以下を3秒維持してOFFする軸警告状態 */
+  isWarning?: boolean
 }
 
 export default function AxisRow({
@@ -41,33 +43,40 @@ export default function AxisRow({
   rb1Color = RB1_COLOR,
   rb2Color = RB2_COLOR,
   theme,
+  isWarning = false,
 }: Props) {
   const { axis, axisLabel, rb1, rb2 } = data
-  const rb1Warn = rb1.torquePeak >= threshold || rb1.speed >= threshold
-  const rb2Warn = rb2.torquePeak >= threshold || rb2.speed >= threshold
   const labelColor = theme?.text
   const speedLabelColor = theme?.subtext
 
   return (
-    <div className="axis-row">
-      <SpeedBar value={rb1.speed} color={rb1Color} labelColor={speedLabelColor} />
+    <div className={`axis-row${isWarning ? ' axis-row--warning' : ''}`}>
+      <SpeedBar value={rb1.speed} color={rb1Color} valueSide="right" />
 
       <TorqueBar
         side="left"
         value={rb1.torqueValue}
         peak={rb1.torquePeak}
-        color={rb1Color}
+        color={isWarning ? WARN_COLOR : rb1Color}
         threshold={threshold}
         mutedColor={speedLabelColor}
       />
 
       <div className="axis-row__center">
-        <div className="axis-row__warn-slots">
-          {rb1Warn && <span className="axis-row__warn">!</span>}
-          {rb2Warn && <span className="axis-row__warn">!</span>}
-        </div>
-        <div className="axis-row__label" style={{ color: labelColor }}>
-          {axisLabel ?? `軸${axis}`}
+        <div className="axis-row__icon-box" style={{ borderColor: `${labelColor ?? '#9aa4b2'}55` }}>
+          {/* public/{軸名}.png を軸アイコンとして表示。軸名は編集パネルで変更可能なため、
+             画像が用意されていない軸名の場合はimgを非表示にして文字ラベルのみ残す */}
+          <img
+            className="axis-row__icon-img"
+            src={`/${axisLabel ?? `軸${axis}`}.png`}
+            alt=""
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+            }}
+          />
+          <div className="axis-row__label" style={{ color: labelColor }}>
+            {axisLabel ?? `軸${axis}`}
+          </div>
         </div>
       </div>
 
@@ -75,12 +84,12 @@ export default function AxisRow({
         side="right"
         value={rb2.torqueValue}
         peak={rb2.torquePeak}
-        color={rb2Color}
+        color={isWarning ? WARN_COLOR : rb2Color}
         threshold={threshold}
         mutedColor={speedLabelColor}
       />
 
-      <SpeedBar value={rb2.speed} color={rb2Color} labelColor={speedLabelColor} />
+      <SpeedBar value={rb2.speed} color={rb2Color} valueSide="left" />
     </div>
   )
 }

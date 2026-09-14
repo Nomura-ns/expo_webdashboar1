@@ -1,256 +1,18 @@
+/* OperationResults.css
+ *
+ * 改修仕様書（ダッシュボード改修仕様書）に基づく全面リライト版。
+ * 最低文字サイズは20pxを基本とする（このコンポーネント配下のみ。
+ * PanelFrame.css等の共通部品は影響範囲が他ページにも及ぶため今回は対象外）。
+ */
+
 .op-results {
   position: relative;
   display: flex;
-  flex: 1;          /* PanelFrame内で余白ではなく実際の高さいっぱいまで伸びる */
+  flex: 1;
   flex-direction: column;
-  min-height: 0;    /* これが無いと中身の合計高さぶん膨張し、パネル下端を突き破る */
-  gap: 6px;
-}
-
-/* ===== QR避け余白の調整（このページ専用） =====
-   PanelFrame共通のreserveForQrは「右帯＋下帯」を二重に確保する安全設計だが、
-   op-resultsの中身は常に上から下へ積み上がる縦積みレイアウトのため、
-   panel-frame__bodyのpadding-bottomだけで既にQRの高さ帯を丸ごと避けられている
-   （QRは画面右下、bottomからのオフセットの中に完全に収まるため）。
-   右側のpadding-rightは二重の保険にすぎず、QRの真上に来ないバッジ行や
-   フロー図まで幅を無駄に狭めてしまうので、このページに限り打ち消す。
-   PanelFrame.css側の共通定義は変更しない（他ページへの影響を避けるため）。 */
-.op-results.panel-frame--reserve-qr .panel-frame__body {
-  padding-right: 0;
-}
-
-/* ===== 上部：指標バッジ（検査回数・異常回数・上刃挿入回数・ねじ締め回数・ねじ緩め回数） ===== */
-
-.op-results__badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.op-results__badge {
-  flex: 1 1 160px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-}
-
-.op-results__badge-label {
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.op-results__badge-value-wrap {
-  display: flex;
-  align-items: baseline;
-  gap: 3px;
-}
-
-.op-results__badge-value {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.op-results__badge-unit {
-  font-size: 20px;
-}
-
-/* モバイル版のNG回数バッジ：末尾にOK回数を括弧書きで添える */
-.op-results__badge-sub {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  margin-left: 2px;
-}
-
-/* ===== 全体サイクルタイム ===== */
-
-.op-results__overall-row {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.op-results__cycle-badge {
-  flex: 0 0 200px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 6px 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  text-align: center;
-  transform: translateY(-10px);
-}
-
-.op-results__cycle-badge-label {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.op-results__cycle-badge-value {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.op-results__axis-label {
-  font-size: 25px; /* 現状定義が見当たらないので明示しておくと安全 */
-}
-
-/* ===== フロー図（スクロール表示可能） ===== */
-
-.op-results__flow-scroll {
-  overflow: auto;
-  border-radius: 6px;
-}
-
-.op-results__flow-scroll--overall {
-  /* JobFlowDiagram.tsx の OVERALL_SIZING と連動：
-     topPad(24) + maxH(diamondH:108) + bottomPad(24) = 156px が実際のSVG高さ。
-     ここが実高さより小さいと、overflow-y:hiddenでひし形の下側が切れ、
-     さらにこのpanel-frame__bodyの「自然な高さ」計測（scale-inner側）も
-     過小評価されて自動フィットのスケール計算がずれるので、必ずSIZINGの
-     変更に合わせて更新すること。 */
-  max-height: 160px;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-.op-results__flow-scroll--robot {
-  /* JobFlowDiagram.tsx の ROBOT_SIZING と連動：
-     topPad(22) + maxH(diamondH:100) + bottomPad(22) = 144px が実際のSVG高さ。
-     上と同じ理由でSIZING変更時は必ず更新すること。 */
-  max-height: 150px;
-  overflow-x: auto;
-  overflow-y: hidden;
-}
-
-/* ===== RB1／RB2 フロー見出し行（サイクルタイム表示のみ。枠は各フローのFlowPanel側） ===== */
-
-.op-results__robot-flows-header {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.op-results__robot-col-title {
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.op-results__robot-col-cycle {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.op-results__robot-col-cycle strong {
-  font-size: 13px;
-  font-weight: 700;
-  margin-right: 4px;
-}
-
-/* ===== 下部：円グラフ／棒グラフ ===== */
-
-.op-results__charts-row {
-  display: flex;
-  gap: 16px;
-  flex: 0 0 260px;
-  align-items: stretch;
-}
-
-.op-results__pie-panel,
-.op-results__bar-panel {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 100%;
-}
-
-.op-results__pie-panel {
-  flex: 0 0 23%;
-  align-items: center;
-}
-
-.op-results__bar-panel {
-  flex: 0 0 80%;
-}
-
-.op-results__panel-title {
-  margin: 0 0 6px;
-  font-size: 15px;
-  text-align: center;
-}
-
-.op-results__chart-wrap {
-  flex: 1 1 0;      /* 凡例の高さを確保した残りだけをグラフ本体に割り当てる */
   min-height: 0;
-  display: flex;
-  
+  gap: 10px;
 }
-
-.op-results__chart {
-  width: 90%;
-  height: 100%;
-}
-
-/* 棒グラフ専用の追加ルール
-   ※以前はここに aspect-ratio: 1500/300 を指定して高さを幅から逆算していたが、
-     それだと親(chart-wrap)がflexで伸縮しても高さが追従しなかった。
-     SVG側はviewBox + preserveAspectRatio="xMidYMid meet"で縦横比を保ったまま
-     枠内に収まるよう自動調整されるので、こちら側は単純に flex で
-     使える分だけ伸縮させれば良い。 */
-.op-results__chart-wrap--bar {
-  width: 90%;
-}
-
-.op-results__chart--bar {
-  width: 100%;
-  height: 100%;
-}
-
-/* ===== 凡例 ===== */
-
-.op-results__legend {
-  flex: 0 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 4px 16px;
-  margin-top: 4px;
-}
-
-.op-results__legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.op-results__bar-value-label {
-  font-size: 20px; /* 9px→11pxなど、今後さらに大きくしてもOK */
-  font-weight: 700;
-}
-
-.op-results__swatch {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-/* ===== 編集パネル ===== */
 
 .op-results__body {
   display: flex;
@@ -267,11 +29,7 @@
   flex-direction: column;
 }
 
-/* ===== 自動フィット用ラッパー =====
-   52インチ／55インチ等、モニタごとに実際に使える高さが変わっても
-   スクロールなしで収まるよう、中身全体をtransform: scaleで拡大・縮小する。
-   outer = 実際に使える高さの枠（overflow:hiddenでこれ以上ははみ出させない）
-   inner = 中身本来の高さ。outerとinnerの比率をJS側で計算しscaleに反映する。 */
+/* ===== 自動フィット用ラッパー（52インチ／55インチ等モニタごとの実高さ差に追従） ===== */
 .op-results__scale-outer {
   flex: 1;
   min-height: 0;
@@ -288,6 +46,343 @@
   transform-origin: top left;
   transition: transform 0.15s ease-out, width 0.15s ease-out;
 }
+
+/* サイクル履歴（モバイル版）：モバイルはグリッドを使わないため、ここで幅・余白を調整する。
+   デスクトップ版は op-results__graph-history-col 側でグラフの直下にボックス表示する。 */
+.op-results__cycle-wrap {
+  flex: 0 0 auto;
+  width: 90%;
+  margin: 8px auto 0;
+}
+
+/* =========================================================================
+   ① 最上部：ロボットフロー（全体フローのみ。横幅50〜60%を目安に中央配置）
+   ② 左：KPIカード縦配置　　③ 右：OK/NG＋刃物画像
+   ========================================================================= */
+
+.op-results__top-grid {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr) 260px;
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 14px;
+  row-gap: 8px;
+  align-items: stretch;
+  min-height: 0;
+}
+
+/* --- KPIカード（左） --- */
+
+.op-results__kpi-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  /* overflowをvisible以外にすることで、このカラムの内容量がグリッドの行(①フロー行／
+    ④OK-NG・グラフ行)の高さを無理に押し広げないようにする。5枚目のカード(取出実行回数)が
+     下のサイクルタイム欄にめり込んで見えていた不具合の対策。 */
+  overflow: hidden;
+  grid-column: 1;
+  grid-row: 1 / span 2;
+}
+
+.op-results__kpi-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border-left-width: 5px;
+  border-left-style: solid;
+  min-height: 0;
+}
+
+.op-results__kpi-label {
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.op-results__kpi-value-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.op-results__kpi-value {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.op-results__kpi-unit {
+  font-size: 20px;
+}
+
+/* 異常回数カードはうっすら赤みを付けて視認性を上げる（常時） */
+.op-results__kpi-card--anomaly {
+  background: rgba(224, 80, 63, 0.14);
+}
+
+/* --- フロー（中央） --- */
+
+.op-results__flow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  grid-column: 2 / span 2;
+  grid-row: 1;
+}
+
+.op-results__flow-col > * {
+  width: 100%;
+}
+
+/* --- OK/NG＋刃物画像（右） --- */
+
+/* OK/NGドーナツ＋刃物画像は別々の枠にせず、1個のボックスとして統合する。
+   NG発生時はこのボックスごと赤枠＋点滅させる（刃物画像枠単体の点滅は廃止）。 */
+.op-results__okng-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 280px;
+  min-height: 0;
+  grid-column: 3;
+  grid-row: 2;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.op-results__okng-col--ng {
+  border-color: #e0503f;
+  animation: blade-ng-blink 1s ease-in-out infinite;
+}
+
+.op-results__okng-donut-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 150px;
+}
+
+.op-results__okng-chart {
+  display: block;
+  width: 100%;
+  max-width: 150px;
+  max-height: 150px;
+  flex: 0 0 auto;
+  height: auto;
+  margin: 0 auto;
+}
+
+.op-results__okng-legend {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.op-results__okng-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+.op-results__swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* 刃物画像：説明文・NORMAL表記は廃止。枠線・点滅は外側の op-results__okng-col--ng に統合済みのため、
+   ここでは画像位置合わせのみ担当する（OK/NGボックス内の下段に配置） */
+.op-results__blade-frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 180px;
+  min-height: 180px;
+  margin-top: auto;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.op-results__blade-frame img {
+  max-width: 95%;
+  max-height: 180px;
+  object-fit: contain;
+}
+
+@keyframes blade-ng-blink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 80, 63, 0.55); }
+  50% { box-shadow: 0 0 0 8px rgba(224, 80, 63, 0); }
+}
+
+/* =========================================================================
+   ④ グラフエリア統合（日別実績／10秒稼働率を自動切替）
+   ========================================================================= */
+
+/* グラフ＋サイクル履歴をまとめる列（②中央下段）。グラフの下の余白をなくし、
+   すぐ下にサイクル履歴ボックスを配置するための縦積みラッパー */
+.op-results__graph-history-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.op-results__graph-carousel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.op-results__graph-carousel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+}
+
+.op-results__graph-carousel-title {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.op-results__graph-carousel-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.op-results__graph-carousel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  opacity: 0.35;
+}
+
+.op-results__graph-carousel-dot--active {
+  opacity: 1;
+}
+
+.op-results__graph-carousel-body {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.op-results__chart {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.op-results__legend {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.op-results__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+/* =========================================================================
+   ⑤ サイクル履歴（グラフのすぐ下・ボックス表示）
+   ========================================================================= */
+
+.op-results__cycle-history {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.op-results__cycle-history-title {
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.op-results__cycle-history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.op-results__cycle-history-table th,
+.op-results__cycle-history-table td {
+  font-size: 16px;
+  padding: 2px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.op-results__cycle-history-table th {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* 新規行が下から追加されて上へスライドするアニメーション */
+.op-results__cycle-history-row--enter {
+  animation: cycle-row-slide-in 0.4s ease-out;
+}
+
+@keyframes cycle-row-slide-in {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.op-results__status-pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* =========================================================================
+   編集パネル
+   ========================================================================= */
 
 .op-results__edit-panel {
   width: 280px;
@@ -352,19 +447,13 @@
 
 .op-results__panel-section h3 {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: 20px;
 }
 
 .op-results__edit-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
-}
-
-.op-results__hint {
-  margin: 0 0 8px;
-  font-size: 11px;
-  line-height: 1.4;
 }
 
 .op-results__color-row {
@@ -375,7 +464,7 @@
 }
 
 .op-results__color-row-label {
-  font-size: 13px;
+  font-size: 20px;
 }
 
 .op-results__color-input {
@@ -391,7 +480,7 @@
 .op-results__color-reset {
   margin-top: 4px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 20px;
   border: 1px solid var(--border-color);
   border-radius: 6px;
   background: transparent;
@@ -399,46 +488,23 @@
   align-self: flex-start;
 }
 
-/* ===== モニタ（52インチ等の大画面）向け文字サイズ調整 =====
-   768px超（モバイル以外）が対象。固定幅の箇所は文字が被らないよう幅も広げる */
-@media (min-width: 769px) {
-  .op-results__badge-label {
-    font-size: 15px;
-  }
-  .op-results__badge-value {
-    font-size: 21px;
-  }
-  .op-results__badge-unit {
-    font-size: 22px;
-  }
+/* =========================================================================
+   モバイル版：KPIは横スクロールカード、フローはJobFlowDiagram側の簡易表示、
+   刃物画像は非表示、サイクルタイム／サイクル履歴／ステータスリストを追加表示
+   ========================================================================= */
 
-  .op-results__cycle-badge {
-    flex-basis: 220px;
-  }
-  .op-results__cycle-badge-label {
-    font-size: 15px;
-  }
-  .op-results__cycle-badge-value {
-    font-size: 21px;
-  }
+/* モバイル版のサイクル履歴：開始/終了時刻を非表示にし、サイクルタイム・ステータスのみ表示 */
+.op-results__cycle-history--mobile .op-results__cycle-history-table th:nth-child(1),
+.op-results__cycle-history--mobile .op-results__cycle-history-table th:nth-child(2),
+.op-results__cycle-history--mobile .op-results__cycle-history-table th:nth-child(3),
+.op-results__cycle-history--mobile .op-results__cycle-history-table td:nth-child(1),
+.op-results__cycle-history--mobile .op-results__cycle-history-table td:nth-child(2),
+.op-results__cycle-history--mobile .op-results__cycle-history-table td:nth-child(3) {
+  display: none;
+}
 
-  .op-results__robot-col-title {
-    font-size: 16px;
-  }
-  .op-results__robot-col-cycle {
-    font-size: 14px;
-  }
-  .op-results__robot-col-cycle strong {
-    font-size: 16px;
-  }
-
-  .op-results__panel-title {
-    font-size: 17px;
-  }
-  .op-results__legend-item {
-    font-size: 15px;
-  }
-  .op-results__color-row-label {
-    font-size: 15px;
+@media (max-width: 768px) {
+  .op-results__top-grid {
+    grid-template-columns: 1fr;
   }
 }

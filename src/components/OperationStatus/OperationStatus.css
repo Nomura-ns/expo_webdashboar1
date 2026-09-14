@@ -1,3 +1,8 @@
+.op-status {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
 .axis-monitor {
   display: flex;
   flex-direction: column;
@@ -25,22 +30,21 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 /* 軸ラベル列の幅・速度ゲージ列の幅を、ヘッダー行・データ行の両方で揃えるための共通グリッド
-   ※以前は端の列が100pxしか無く、速度ゲージ・稼働率ドーナツが窮屈で小さく見える
-     原因になっていたため、150pxに拡幅した */
+  ※端の列を220pxに広げ、速度ゲージ・稼働率ドーナツの視認性を確保する */
 .axis-monitor__header-row {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 150px minmax(0, 1fr) 150px;
+  grid-template-columns: 220px minmax(0, 1fr) 220px minmax(0, 1fr) 220px;
   align-items: center;
   column-gap: 14px;
 }
 
 .axis-row {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 150px minmax(0, 1fr) 150px;
+  grid-template-columns: 220px minmax(0, 1fr) 220px minmax(0, 1fr) 220px;
   align-items: stretch; /* center -> stretch: 行の高さぴったりに子要素を伸ばし、はみ出しを防ぐ */
   column-gap: 14px;
 }
@@ -64,7 +68,7 @@
 }
 
 .axis-monitor__unit {
-  font-size: 15px;
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
 }
 
@@ -79,7 +83,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 18px; /* 12px→13px：52インチ視聴での視認性向上 */
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
   white-space: nowrap;
 }
@@ -140,7 +144,7 @@
 }
 
 .axis-monitor__clock {
-  font-size: 15px;
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -152,14 +156,17 @@
   flex: 0 0 auto;
 }
 
-/* RB1/RB2バッジを、それぞれの速度ゲージ列（軸行の左端／右端＝100px列）の
+/* RB1/RB2バッジを、それぞれの速度ゲージ列（軸行の左端／右端＝220px列）の
    真上に明示的に位置合わせする。中央見出しも軸ラベル列（150px）に揃える。
    ※これが無いと3つの子要素が1,2,3列目に自動配置され、RB2バッジが
    実際のRB2速度ゲージ位置とずれてしまう（要望「RB2稼働率をRB2速度側へ」の原因）。 */
+/* RB1側：[RB1ラベル箱][平均速度ゲージ]を横並びにするため、速度ゲージ列＋トルク列
+   （1〜2列目）を1つのflexコンテナとしてspanする。RB2側はその左右反転（4〜5列目）。 */
 .axis-monitor__header-rb1 {
-  grid-column: 1;
+  grid-column: 1 / 3;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 14px;
 }
 
 .axis-monitor__header-center {
@@ -167,9 +174,18 @@
 }
 
 .axis-monitor__header-rb2 {
-  grid-column: 5;
+  grid-column: 4 / 6;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+/* ヘッダー行内の平均速度ゲージはラベル箱の残り幅いっぱいに広がる */
+.axis-monitor__header-rb1 > .speed-gauge,
+.axis-monitor__header-rb2 > .speed-gauge {
+  flex: 1;
+  min-width: 0;
 }
 
 .robot-header-badge {
@@ -182,7 +198,7 @@
   justify-content: flex-end;
 }
 
-/* 速度ゲージ列（幅150pxに拡幅）に収まるよう、ドーナツ→テキストを縦積みするレイアウト */
+/* 速度ゲージ列（幅220px）に収まるよう、ドーナツ→テキストを縦積みするレイアウト */
 .robot-header-badge--stacked {
   flex-direction: column;
   align-items: center;
@@ -207,21 +223,40 @@
 }
 
 .robot-header-badge__title {
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 800;
 }
 
 .robot-header-badge--stacked .robot-header-badge__title {
-  font-size: 19px;
+  font-size: 45px;
+}
+
+/* 'boxed'：RB1/RB2ラベルだけを収める枠付きの箱。縦方向には間延びさせず、
+   テキストの高さに合わせた大きさにする（フォントサイズはstackedと同じ45pxのまま）。
+   横に平均速度ゲージを並べるレイアウト（axis-monitor__header-rb1/rb2）で使用する。 */
+.robot-header-badge--boxed {
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 8px 26px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.robot-header-badge--boxed .robot-header-badge__title {
+  font-size: 45px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .robot-header-badge__caption {
-  font-size: 12px;
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
 }
 
 .robot-header-badge--stacked .robot-header-badge__caption {
-  font-size: 15px;
+  font-size: 20px;
   white-space: nowrap;
 }
 
@@ -229,28 +264,42 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   text-align: center;
 }
 
+/* 中央「トルク」見出しバッジ：RB1/RB2ラベル箱・平均速度ゲージと高さを揃えつつ、
+   トルクバー群（軸1〜6の中央列）の見出しとして機能する */
+.axis-monitor__torque-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 22px;
+  border: 2px solid;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 25px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.axis-monitor__torque-badge-icon {
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 3px currentColor);
+}
+
 .axis-monitor__header-center-title {
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .axis-monitor__header-center-caption {
-  font-size: 12px;
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
 }
 
-/* 稼働率ドーナツ：ヘッダーバッジ内に収まるようコンパクト化
-   ※列幅を150pxに拡幅したのに合わせてドーナツ自体も大きくした（72px→96px→88px）。
-   また、数字と%記号・キャプションが重なって表示される不具合があったため、
-   ドーナツ中央のテキストレイアウトをここで明示的に固定（横並び・折り返し無し・
-   中央揃え）し、ベースのUtilizationRateDisplay側のスタイルに依存しないようにした。
-   さらに、__ring に position:relative／__center に position:absolute; inset:0 を
-   ここで明示することで、中央の数字がリング枠の外（＝下のRB1/RB2ラベル側）に
-   はみ出して重なって見える事故を防ぐ（ベースCSS側の指定に依存しない）。 */
+/* ===== 稼働率ドーナツ（RB1/RB2） ===== */
 .utilization-donut--compact .utilization-donut__ring {
   position: relative;
   display: flex;
@@ -280,7 +329,7 @@
 }
 
 .utilization-donut--compact .utilization-donut__percent {
-  font-size: 14px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -290,12 +339,89 @@
   stroke-width: 14;
 }
 
+/* =====================================================================
+   6軸平均速度ゲージ（各トルクグラフ群の直上・モニタ版専用）
+   透明ガラス調・近未来感のある横長ゲージ。数値ラベルは表示せず、
+   バーの充填度合いのみで速度の度合いを見せる。
+   axis-monitor__header-row / axis-row と同じ5列グリッドを再利用し、
+   RB1トルク列（2列目）・RB2トルク列（4列目）に位置を揃える
+   ===================================================================== */
+
+.speed-gauge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  height: 100%;
+  min-height: 54px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border-width: 1px;
+  border-style: solid;
+  box-sizing: border-box;
+  /* すりガラス風：半透明グラデーション＋ぼかし */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -6px 10px rgba(0, 0, 0, 0.25);
+}
+
+.speed-gauge__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.speed-gauge__divider {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.speed-gauge__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.speed-gauge__label {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speed-gauge__track {
+  position: relative;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.speed-gauge__fill {
+  height: 100%;
+  border-radius: 999px;
+  /* PLC値の更新に合わせて滑らかに追従させる */
+  transition: width 0.4s ease;
+}
+
+/* 平均速度ゲージはモニタ（大画面）専用。狭幅では横スクロール防止のため非表示にし、
+   RB1/RB2ラベル箱のみ残す（タブレット用ブレークポイント900pxに合わせる。
+   実際の非表示ルールは下部「狭幅対応」内の.axis-monitor__header-rb1/rb2 .speed-gaugeを参照） */
+
 /* ===== 軸1〜6の行 ===== */
 
 .axis-monitor__rows {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   flex: 1;
   min-height: 0;
 }
@@ -305,12 +431,26 @@
   min-height: 0;
 }
 
+.axis-row--warning {
+  border-radius: 6px;
+  animation: axis-row-warning-flicker 1s ease-in-out infinite;
+}
+
+.axis-row--warning .axis-row__label {
+  color: #ff4d4f !important;
+}
+
+@keyframes axis-row-warning-flicker {
+  0%, 100% { background: transparent; }
+  50% { background: rgba(255, 77, 79, 0.14); }
+}
+
 .axis-row__center {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 8px;
 }
 
 .axis-row__warn-slots {
@@ -328,15 +468,34 @@
   border-radius: 50%;
   background: rgba(255, 77, 79, 0.16);
   color: #ff4d4f;
-  font-size: 10px;
+  font-size: 20px;
   font-weight: 800;
 }
 
 .axis-row__label {
-  font-size: 16px; /* 14px→16px：52インチ視聴での視認性向上 */
+  font-size: 25px;
   font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
+}
+
+/* 軸中央のアイコンボックス：public/{軸名}.png（例：Z.png, X.png）を表示するための枠。
+   画像が存在しない軸名の場合はAxisRow.tsx側でimgをdisplay:noneにし、文字ラベルのみ残す */
+.axis-row__icon-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  border: 2px solid;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.axis-row__icon-img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 /* ===== トルクバー（ピラミッド型・片側分） ===== */
@@ -345,14 +504,14 @@
   position: relative;
   height: 100%;
   min-height: 0;
-  padding-top: 20px;
+  padding-top: 28px;
 }
 
 .torque-bar__track {
   position: absolute;
   left: 0;
   right: 0;
-  top: 20px;
+  top: 28px;
   bottom: 0;
   border-radius: 6px;
   background: var(--bg-inset, rgba(255, 255, 255, 0.04));
@@ -379,11 +538,19 @@
 
 .torque-bar__value {
   padding: 0 8px;
-  font-size: 13px; /* 12px→13px：52インチ視聴での視認性向上 */
+  font-size: 25px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55); /* RB色を任意色に変更しても白文字の視認性を保つ */
   white-space: nowrap;
+}
+
+.torque-bar__peak-value {
+  display: inline-block;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  text-shadow: none;
 }
 
 /* しきい値の目安線（常時薄く表示。中心からの距離はピークと同じ座標系） */
@@ -399,17 +566,17 @@
 /* ピークの目盛り線：ラベルとの間に隙間を作るため、padding-top内から始まる */
 .torque-bar__peak-tick {
   position: absolute;
-  top: 14px;
+  top: 20px;
   bottom: 0;
   width: 0;
-  border-left: 1.5px solid;
+  border-left: 2px solid;
 }
 
 /* ピークのラベル：目盛り線よりさらに上に置き、線と重ならないようにする */
 .torque-bar__peak-label {
   position: absolute;
   top: 0;
-  font-size: 11px; /* 10px→11px：52インチ視聴での視認性向上 */
+  font-size: 20px;
   font-weight: 700;
   white-space: nowrap;
 }
@@ -422,63 +589,98 @@
   transform: translateX(-50%);
 }
 
-/* ===== 速度ゲージ（横長バー型・左右外側） ===== */
-/* 旧SpeedRing（円形）は縦方向を圧迫していたため、横長のSpeedBarに変更。
-   幅は列幅（100px）いっぱいに広げ、高さは最小限に抑えることで
-   トルクバー側の縦スペースを圧迫しないようにしている。 */
+/* ===== 速度ゲージ（アイコン＋ガラス調バー。左右外側） ===== */
+/* 「速度」の文字は各行で繰り返さず、axis-monitor__speed-caption-row側で1か所だけ表示する。
+   数値はゲージ内を追従するバブルではなく、軸ラベル側（中央寄り）に固定表示する
+   （RB1側はゲージの右、RB2側はゲージの左＝どちらも中央寄り）。 */
 
 .speed-bar {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
   height: 100%;
   min-height: 0;
-  width: 100%;
-  /* 下側にバブル（数値）を移動したため、その分の余白をpadding-bottomで確保する
-     （TorqueBarのpadding-topでピークラベル用の余白を確保しているのと同じ考え方） */
-  padding: 0 4px 26px;
   box-sizing: border-box;
 }
 
-.speed-bar__label {
-  font-size: 14px; /* 13px→14px：視認性向上 */
-  color: var(--text-secondary, #9aa4b2);
-  white-space: nowrap;
+.speed-bar__gauge {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border-width: 1px;
+  border-style: solid;
+  box-sizing: border-box;
+  /* すりガラス風：AverageSpeedGaugeと質感を統一 */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02));
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.speed-bar__icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  filter: drop-shadow(0 0 3px currentColor);
 }
 
 .speed-bar__track {
   position: relative;
-  width: 100%;
-  height: 22px; /* 18px→22px：視認性向上 */
-  border-radius: 11px;
-  background: var(--bg-inset, rgba(255, 255, 255, 0.08));
-  overflow: visible; /* 数値バブルが下にはみ出せるように */
+  flex: 1;
+  min-width: 0;
+  height: 16px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(147, 197, 253, 0.35);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .speed-bar__fill {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  border-radius: 11px;
+  height: 100%;
+  border-radius: 999px;
+  filter: brightness(1.12) saturate(1.08);
+  box-shadow: 0 0 8px currentColor;
   transition: width 0.3s ease;
 }
 
-.speed-bar__bubble {
-  position: absolute;
-  /* 「速度」ラベルはトラックの上にあるため、数値バブルは上ではなく下に出すことで
-     重なりを解消する */
-  top: calc(100% + 8px);
-  transform: translateX(-50%);
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 15px; /* 14px→15px：視認性向上 */
+.speed-bar__value {
+  flex: 0 0 auto;
+  font-size: 26px;
   font-weight: 800;
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  transition: left 0.3s ease;
+  white-space: nowrap;
+  filter: brightness(1.12) saturate(1.08);
+}
+
+/* ===== 「速度」キャプション（1か所だけ表示） ===== */
+
+.axis-monitor__speed-caption-row {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 220px minmax(0, 1fr) 220px;
+  column-gap: 14px;
+  flex: 0 0 auto;
+}
+
+.axis-monitor__speed-caption {
+  font-size: 25px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary, #9aa4b2);
+}
+
+.axis-monitor__speed-caption--rb1 {
+  grid-column: 1;
+}
+
+.axis-monitor__speed-caption--rb2 {
+  grid-column: 5;
 }
 
 /* ===== 速度リング（旧仕様・未使用だが互換のため残置） ===== */
@@ -494,7 +696,7 @@
 }
 
 .speed-ring__label {
-  font-size: 11px;
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
 }
 
@@ -548,7 +750,7 @@
   width: 100%;
   min-width: 480px; /* 5列を確保。画面が狭い場合は横スクロールに任せる */
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 20px;
 }
 
 .axis-table th,
@@ -560,13 +762,56 @@
 }
 
 .axis-table th {
-  font-size: 11px;
+  font-size: 20px;
   font-weight: 700;
 }
 
 .axis-table__label {
   font-weight: 700;
   text-align: left;
+}
+
+/* RB1/RB2の見出し（列見出しに1回だけ表示。以降は色で識別する） */
+.axis-table__group-head {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+/* 警告（しきい値80%到達〜70%以下で解除）：文字色は変えず、フリッカ（点滅）のみで
+   通知する（モニタ版の.axis-row--warningと動作を統一） */
+.axis-table__cell--warning {
+  animation: axis-table-cell-flicker 1s ease-in-out infinite;
+}
+
+@keyframes axis-table-cell-flicker {
+  0%, 100% { background: transparent; }
+  50% { background: rgba(255, 77, 79, 0.18); }
+}
+
+/* ===== モバイル：RB1/RB2切替トグル ===== */
+/* タップした側を強調、もう一方はAxisTable側でopacityを下げて減光する */
+.axis-monitor__mobile-rb-toggle {
+  display: none;
+  gap: 8px;
+  padding: 2px 0 4px;
+}
+
+.axis-monitor__mobile-rb-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 20px;
+  font-weight: 700;
+  border-radius: 6px;
+  border-width: 1.5px;
+  border-style: solid;
+  background: transparent;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.axis-monitor__mobile-rb-btn--active {
+  opacity: 1;
 }
 
 /* ===== 下部フッター ===== */
@@ -580,7 +825,7 @@
   /* QR避けはPanelFrameのreserveForQr(clip-path + panel-frame__bodyのpadding)に一本化したため、
      ここでの決め打ちのpadding-rightは廃止（残すと二重に余白を取ってしまう） */
   border-top: 1px solid var(--border-soft);
-  font-size: 12px; /* 11px→12px：52インチ視聴での視認性向上 */
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
 }
 
@@ -616,12 +861,12 @@
   padding-bottom: 14px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--border-soft);
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 700;
 }
 
 .axis-monitor__panel-toggle-state {
-  font-size: 12px;
+  font-size: 20px;
   font-weight: 700;
 }
 
@@ -631,12 +876,12 @@
 
 .axis-monitor__panel-section h3 {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 20px;
 }
 
 .axis-monitor__hint {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: 20px;
   line-height: 1.4;
 }
 
@@ -669,13 +914,13 @@
   border: 1px solid var(--border-soft);
   border-radius: 4px;
   background: transparent;
-  font-size: 12px;
+  font-size: 20px;
 }
 
 .axis-monitor__panel-reset {
   margin-top: 4px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 20px;
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   background: transparent;
@@ -693,13 +938,13 @@
   padding: 10px 14px;
   border: 1px dashed var(--border-soft);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: 20px;
   color: var(--text-secondary, #9aa4b2);
 }
 
 .axis-monitor__edit-note button {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: 20px;
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   background: transparent;
@@ -716,9 +961,27 @@
     column-gap: 6px;
   }
 
-  .axis-monitor__header-rb1 { grid-column: 1; }
+  .axis-monitor__header-rb1 { grid-column: 1; justify-content: flex-start; }
   .axis-monitor__header-center { grid-column: 2; }
-  .axis-monitor__header-rb2 { grid-column: 3; }
+  .axis-monitor__header-rb2 { grid-column: 3; justify-content: flex-end; }
+
+  /* 狭幅では平均速度ゲージを非表示にし、RB1/RB2ラベル箱のみ残す
+    （従来のspeed-gauge-row非表示と同等の挙動） */
+  .axis-monitor__header-rb1 > .speed-gauge,
+  .axis-monitor__header-rb2 > .speed-gauge {
+    display: none;
+  }
+
+  /* 列幅が狭くなるため、拡大したRB1/RB2文字はここで少し戻す（収まりを優先） */
+  .robot-header-badge__title,
+  .robot-header-badge--stacked .robot-header-badge__title,
+  .robot-header-badge--boxed .robot-header-badge__title {
+    font-size: 22px;
+  }
+
+  .robot-header-badge--boxed {
+    padding: 4px 12px;
+  }
 
   .axis-monitor__topbar {
     gap: 8px;
@@ -745,7 +1008,7 @@
   }
 
   .utilization-donut--compact .utilization-donut__number {
-    font-size: 18px;
+    font-size: 20px;
   }
 }
 
@@ -766,6 +1029,14 @@
 
   .axis-monitor__rows {
     display: none;
+  }
+
+  .axis-monitor__speed-caption-row {
+    display: none;
+  }
+
+  .axis-monitor__mobile-rb-toggle {
+    display: flex;
   }
 
   .axis-table-scroll {

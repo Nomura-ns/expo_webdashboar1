@@ -2,6 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 
 const GO2RTC_BASE = 'http://localhost:1984'
 
+function waitForIceGatheringComplete(pc: RTCPeerConnection) {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    const handleStateChange = () => {
+      if (pc.iceGatheringState !== 'complete') return
+      pc.removeEventListener('icegatheringstatechange', handleStateChange)
+      resolve()
+    }
+
+    pc.addEventListener('icegatheringstatechange', handleStateChange)
+  })
+}
+
 export function useGo2rtcStream(streamName: string | undefined) {
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +36,7 @@ export function useGo2rtcStream(streamName: string | undefined) {
 
       pc.ontrack = (ev) => {
         if (cancelled) return
-        setStream(ev.streams[0])
+        setStream(ev.streams[0] ?? new MediaStream([ev.track]))
       }
 
       pc.onconnectionstatechange = () => {
@@ -34,11 +48,12 @@ export function useGo2rtcStream(streamName: string | undefined) {
       try {
         const offer = await pc.createOffer()
         await pc.setLocalDescription(offer)
+        await waitForIceGatheringComplete(pc)
 
         const res = await fetch(`${GO2RTC_BASE}/api/webrtc?src=${streamName}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/sdp' },
-          body: offer.sdp,
+          body: pc.localDescription?.sdp,
         })
         if (!res.ok) {
           if (!cancelled) setError(`go2rtc接続失敗 (${res.status})`)

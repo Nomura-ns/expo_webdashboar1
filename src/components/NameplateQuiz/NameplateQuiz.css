@@ -11,7 +11,7 @@
   grid-template-columns:
     clamp(140px, 16%, 220px)   /* side: リング */
     1fr                         /* メイン: 招待カード＋グラフ */
-    clamp(160px, 18%, 300px);   /* mobile: スマホ画像専用列 */
+    clamp(160px, 20%, 340px);   /* mobile: スマホ画像専用列 */
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     'side media   mobile'
@@ -230,7 +230,7 @@
 
 .nameplate-quiz__invite-sub {
   margin: clamp(6px, 1vw, 12px) 0 0;
-  font-size: clamp(13px, 1.1vw, 17px);
+  font-size: clamp(13px, 1.1vw, 20px);
   color: var(--nq-subtext, #94a3b8);
   white-space: nowrap;
 }
@@ -264,10 +264,11 @@
 
 .nameplate-quiz__mobile-preview {
   grid-area: mobile;
-  height: 90%;      /* 縦に伸びてOK。専用列なのでグラフを圧迫しない */
+  height: 100%;
   width: 100%;
-  max-width: 100%;
-  object-fit: contain;
+  object-fit: cover;        /* contain → cover に変更 */
+  object-position: top;     /* 上端基準で、余った分は下に伸びる／はみ出た分は下がクロップ */
+  align-self: stretch;
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
 }
 
@@ -283,7 +284,7 @@
 }
 
 .nameplate-quiz__media-placeholder {
-  font-size: clamp(16px, 1.8vw, 24px);
+  font-size: clamp(16px, 1.8vw, 30px);
   color: var(--nq-subtext, #94a3b8);
 }
 
@@ -697,14 +698,11 @@
   }
 
 
-  .nameplate-quiz__mobile-preview {
-    height: auto;
-    max-width: 60%;
-  }
-}
+ 
 
 .nameplate-quiz__layout.is-mobile {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;         /* ← 追加：1行だけにして全高さを使う */
   grid-template-areas: 'media';    /* ← 'choices' 行を削除 */
+}
 }

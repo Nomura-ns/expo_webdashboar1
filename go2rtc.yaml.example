@@ -1,0 +1,10 @@
+# go2rtc.yaml.example
+streams:
+  cam1: rtsp://root:【ここにパスワードを入力】@192.168.0.1:554/axis-media/media.amp
+  cam2: rtsp://root:【ここにパスワードを入力】@192.168.0.2:554/axis-media/media.amp
+
+webrtc:
+  listen: ":8555"
+
+api:
+  listen: ":1984"

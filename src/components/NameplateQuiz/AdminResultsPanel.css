@@ -255,7 +255,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: clamp(12px, 1.1vw, 16px);
+  font-size: clamp(12px, 1.1vw, 18px);
   color: var(--nq-subtext, #94a3b8);
   white-space: nowrap;
 }
@@ -269,7 +269,7 @@
 }
 
 .admin-panel__modal--embedded .admin-panel__chart-x-label {
-  font-size: clamp(13px, 1.3vw, 20px);
+  font-size: clamp(16px, 1.8vw, 28px);
 }
 .admin-panel__modal--embedded .admin-panel__chart-y-label {
   font-size: clamp(15px, 1.5vw, 22px);
@@ -355,12 +355,11 @@
 }
 
 .admin-panel__modal--embedded .admin-panel__bar-value {
-  font-size: clamp(13px, 1.1vw, 16px);
+  font-size: clamp(13px, 1.5vw, 16px);
 }
 
 .admin-panel__modal--embedded .admin-panel__chart-section {
   margin-top: clamp(20px, 2.4vw, 32px);
-  /* ↓ 追加 */
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
@@ -368,7 +367,7 @@
 }
 
 .admin-panel__modal--embedded .admin-panel__chart-title {
-  font-size: clamp(15px, 1.3vw, 19px);
+  font-size: clamp(15px, 1.3vw, 20px);
   margin-bottom: clamp(8px, 1vw, 14px);
 }
 
@@ -397,7 +396,7 @@
 }
 
 .admin-panel__modal--embedded .admin-panel__chart-bar-value {
-  font-size: clamp(13px, 1.3vw, 20px);
+  font-size: clamp(16px, 2.0vw, 35px);
 }
 
 /* ---- ロック画面（embedded時のみ）全体のレイアウト ---- */

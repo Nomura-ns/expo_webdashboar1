@@ -783,6 +783,25 @@
   min-height: 0;
 }
 
+.axis-table-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.axis-table-scroll::-webkit-scrollbar-track {
+  background: var(--panel-raised, #1b222b);
+  border-radius: 999px;
+}
+
+.axis-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--brass, #d6a85f);
+  border: 2px solid var(--panel-raised, #1b222b);
+  border-radius: 999px;
+}
+
+.axis-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--text-primary, #f2f4f7);
+}
+
 .axis-table {
   width: 100%;
   min-width: 480px; /* 5列を確保。画面が狭い場合は横スクロールに任せる */
@@ -1143,12 +1162,39 @@
   }
 
   .axis-table-scroll {
+    position: relative;
     display: block;
     flex: 0 0 auto;
     min-height: 0;
     overflow-x: scroll;
     overflow-y: hidden;
+    padding-bottom: 14px;
     scrollbar-width: auto;
+    scrollbar-color: var(--brass, #d6a85f) var(--panel-raised, #1b222b);
+  }
+
+  /* ネイティブのスクロールバーが自動的に消える端末でも、横スクロール可能と分かるようにする */
+  .axis-table-scroll::before,
+  .axis-table-scroll::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    bottom: 3px;
+    height: 7px;
+    border-radius: 999px;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .axis-table-scroll::before {
+    right: 8px;
+    background: var(--panel-raised, #1b222b);
+    border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.2));
+  }
+
+  .axis-table-scroll::after {
+    width: 28%;
+    background: var(--brass, #d6a85f);
   }
 
   .axis-table {

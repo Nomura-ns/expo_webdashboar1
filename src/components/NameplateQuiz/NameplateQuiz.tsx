@@ -255,7 +255,6 @@ useEffect(() => {
                </div>
                <div className="nameplate-quiz__invite-qr">
                  <span className="nameplate-quiz__invite-qr-label">SCAN ME</span>
-                 {/* /public/QR_dark.png, /public/QR_light.png を themeMode で切り替え */}
                  <img
                    src={theme.qr}
                    alt="クイズ参加用QRコード"

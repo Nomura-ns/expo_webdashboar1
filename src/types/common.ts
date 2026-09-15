@@ -56,4 +56,5 @@ export type CameraFeed = {
   totalSteps?: number
    /** 割り当てた物理カメラのdeviceId（getUserMediaで取得した映像デバイス） */
   deviceId?: string
+  axisStream?: string 
 }

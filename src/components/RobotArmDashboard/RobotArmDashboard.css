@@ -96,36 +96,6 @@
   justify-content: center;
 }
 
-/* 正常巡回中に表示する「カメラ1 ⇄ カメラ2」のような切替インジケーター */
-.robot-dashboard__rotate-indicator {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  font-size: 1.8rem;
-  opacity: 0.85;
-  color: inherit;
-}
-
-.robot-dashboard__rotate-chip {
-  padding: 2px 4px;
-  opacity: 0.55;
-  transition: opacity 0.2s, color 0.2s;
-}
-
-.robot-dashboard__rotate-chip.is-active {
-  opacity: 1;
-  font-weight: 700;
-}
-
-.robot-dashboard__rotate-chip + .robot-dashboard__rotate-chip::before {
-  content: '⇄';
-  margin-right: 4px;
-  opacity: 0.5;
-}
-
 /* --- カメラ枠（メイン単体表示・分割表示・モバイル共通の中身） --- */
 .robot-dashboard__camera-frame {
   position: relative;
@@ -136,18 +106,32 @@
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03);
 }
 
-.robot-dashboard__camera-frame--main {
-  width: 100% !important;
-  height: 100% !important;
-  
-}
+
 
 .robot-dashboard__camera-frame--main {
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+
+/* --- 枠 + REC/経過時間バーのラッパー --- */
+.robot-dashboard__camera-frame-wrap {
+  width: 100%;
   height: 100%;
-  aspect-ratio: 4 / 3;
-  max-width: 100%;
-  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.robot-dashboard__camera-rec-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 4px;
 }
 
 .robot-dashboard__camera-frame.is-normal {
@@ -196,31 +180,6 @@
   );
 }
 
-/* --- カメラ上のオーバーレイ情報 --- */
-.robot-dashboard__camera-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 8px 10px;
-  pointer-events: none;
-}
-
-.robot-dashboard__camera-overlay-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.robot-dashboard__camera-overlay-bottom {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .robot-dashboard__camera-label {
   font-size: 1.5rem;
   font-weight: 600;
@@ -237,18 +196,10 @@
   border-radius: 999px;
 }
 
-.robot-dashboard__camera-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-}
-
 .robot-dashboard__camera-clock {
   font-size: 1.8rem;
   font-variant-numeric: tabular-nums;
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  opacity: 0.85;
 }
 
 .robot-dashboard__camera-rec {
@@ -258,7 +209,6 @@
   font-size: 1.8rem;
   font-weight: 700;
   color: #ff4d4f;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .robot-dashboard__camera-rec-dot {
@@ -315,7 +265,8 @@
 
 .robot-dashboard__split-grid .robot-dashboard__camera-frame {
   width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* --- 編集パネル（右側固定） --- */
@@ -591,6 +542,13 @@
   font-weight: 600;
 }
 
+.robot-dashboard__mobile-frame-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 @media (max-width: 900px) {
   .robot-dashboard__body {
     flex-direction: column;
@@ -688,11 +646,11 @@
   padding: 2px 7px;
 }
 
-.robot-dashboard__mobile-frame .robot-dashboard__camera-clock {
+.robot-dashboard__mobile-frame-wrap .robot-dashboard__camera-clock {
   font-size: 0.7rem;
 }
 
-.robot-dashboard__mobile-frame .robot-dashboard__camera-rec {
+.robot-dashboard__mobile-frame-wrap .robot-dashboard__camera-rec {
   font-size: 0.65rem;
 }
 

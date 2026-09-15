@@ -2,7 +2,6 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import type { Theme, PageKey } from '../../types'
 import { PAGES } from './themes'
 import { useIsMobile } from '../../hooks/useMediaQuery'
-import { PanelLeft } from 'lucide-react';
 
 // =============================================
 // ミニプレビュー用サムネイル枠
@@ -582,60 +581,20 @@ export default function Sidebar({
 
   return (
     <>
-      {/* ブックマークタブ */}
-      <div style={{
-        position: 'fixed',
-        top: '57px', // スライドパネル側のtopと同じ基準（ヘッダー高さ）に揃える
-        left: sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'flex-start',
-        zIndex: 50,
-        transition: 'left 0.2s ease',
-      }}>
-       <div
-  onClick={onToggle}
-  onMouseEnter={handleSidebarMouseEnter}
-  style={{
-    background: sidebarOpen ? theme.accent : theme.surface,
-    color: sidebarOpen ? '#fff' : theme.subtext,
-    border: `1px solid ${sidebarOpen ? theme.accent : theme.border}`,
-    borderRadius: '6px 6px 0 0',
-
-    /* ← 余白を追加 */
-    padding: '8px 14px',
-
-    /* ← 高さを固定して見た目を安定させる */
-    height: '32px',
-
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-
-    fontSize: '14px',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-
-    /* rotate(90deg)を要素自身の左上を基準に回転させたあと、
-       translateY(-100%)＝自分自身の高さぶんだけ（％指定なので常に正確に）
-       引き戻すことで、画面サイズに関わらず必ず左端ぴったりに揃う。
-       以前のtranslateX(40px)/translateY(60px)は特定の画面幅でしか
-       合わない当て推量だったため廃止。 */
-    transform: 'rotate(90deg) translateY(-100%)',
-    transformOrigin: 'top left',
-
-    whiteSpace: 'nowrap',
-  }}
->
-  <PanelLeft
-    size={14}
-    style={{ transform: 'rotate(-90deg)' }}
-  />
-  画面切替
-</div>
-
-      </div>
+      {/* 画面端の開閉トリガー（非表示エリア）: sidebarが閉じている時だけ反応させる */}
+      {!sidebarOpen && (
+        <div
+          onMouseEnter={handleSidebarMouseEnter}
+          style={{
+            position: 'fixed',
+            top: '57px',
+            left: 0,
+            bottom: `${footerHeight}px`,
+            width: '12px', // 端に置く反応幅。狭すぎると発火しづらいので調整可
+            zIndex: 45,    // パネル(40)より前面、オーバーレイ(30)より前面
+          }}
+        />
+      )}
 
       {/* スライドパネル */}
       <div
@@ -663,8 +622,6 @@ export default function Sidebar({
             ページ切り替え
           </p>
 
-          {/* ページ一覧：flexで縦方向を均等分割 → 画面サイズが変わっても
-              常にPAGES.length枚ぶん(=4枚)が枠内に収まる。スクロールも不要。 */}
           <div style={{
             flex: 1, minHeight: 0,
             display: 'flex', flexDirection: 'column', gap: '8px',
@@ -684,7 +641,6 @@ export default function Sidebar({
                   transition: 'all 0.2s',
                 }}
               >
-                {/* ページ名 */}
                 <div style={{
                   padding: '2px 4px', fontSize: '12px',
                   color: currentPage === page.key ? theme.accent : theme.text,
@@ -701,7 +657,6 @@ export default function Sidebar({
                   {page.label}
                 </div>
 
-                {/* ミニプレビュー：枠の幅・高さにぴったりフィットさせる */}
                 <div style={{
                   flex: 1, minHeight: 0,
                   overflow: 'hidden',

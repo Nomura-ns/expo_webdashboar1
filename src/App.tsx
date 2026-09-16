@@ -16,6 +16,7 @@ import { usePlcRobotStatusSignals } from './hooks/usePlcRobotStatusSignals'
 import { usePlcOperationMetricsSignals } from './hooks/usePlcOperationMetricsSignals'
 import { OPERATION_METRICS_ADDRESSES } from './config/operationMetricsAddresses'
 import { getRecentDates, METRIC_DAYS } from './utils/dateRange'
+import { ALL_ROBOT_STATUS_ADDRESSES } from './config/robotStatusAddresses'
 
 
 // 稼働状況（anomalyページ）用のサンプルデータ
@@ -215,11 +216,12 @@ export default function App() {
     isPlaying: true,
     intervalSec: 0.5,
     selectedAddresses: [
-      JOB_FLOW_STEP_ADDRESS,
-      JOB_FLOW_CYCLE_CURRENT_ADDRESS,
-      JOB_FLOW_CYCLE_TOTAL_ADDRESS,
-      ...OPERATION_METRICS_ADDRESSES,
-    ],
+  JOB_FLOW_STEP_ADDRESS,
+  JOB_FLOW_CYCLE_CURRENT_ADDRESS,
+  JOB_FLOW_CYCLE_TOTAL_ADDRESS,
+  ...OPERATION_METRICS_ADDRESSES,
+  ...ALL_ROBOT_STATUS_ADDRESSES,
+  ],
   })
 
   const { activeStep } = usePlcJobFlowSignals(plcData)

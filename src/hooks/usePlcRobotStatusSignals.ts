@@ -15,7 +15,7 @@ import type { DataPoint } from '../types'
 
 import {
   getLatestDataPoint,
-  read2WordSignedAddress,
+  readAddress,
 } from '../utils/usePlcSignalUtils'
 
 import {
@@ -66,19 +66,19 @@ export function usePlcRobotStatusSignals(
      * 指定したロボットの6軸分の
      * 現在トルク / 最大トルクを取得する。
      */
-    const buildAxisStats = (
-      robot: RobotKey,
+ const buildAxisStats = (
+    robot: RobotKey,
     ): AxisTorqueStat[] =>
-      ROBOT_AXIS_ADDRESSES[robot].map((addr) => ({
-        torque: read2WordSignedAddress(
-          latest,
-          addr.torque,
-        ),
-        peakTorque: read2WordSignedAddress(
-          latest,
-          addr.peakTorque,
-        ),
-      }))
+    ROBOT_AXIS_ADDRESSES[robot].map((addr) => ({
+    torque: readAddress(
+      latest,
+      addr.torque,
+    ),
+    peakTorque: readAddress(
+      latest,
+      addr.peakTorque,
+    ),
+  }))
 
     return {
       rb1AxisTorques: buildAxisStats('RB1'),

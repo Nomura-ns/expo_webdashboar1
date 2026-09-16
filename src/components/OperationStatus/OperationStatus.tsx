@@ -206,7 +206,7 @@ export default function OperationStatus({
                （RB1側＝1列目／RB2側＝5列目。軸ごとのSpeedBarはアイコンのみ） */}
             <div className="axis-monitor__speed-caption-row">
               <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb1" style={{ color: theme.text }}>
-                速度 (mm/s)
+                速度 (deg/s)
               </span>
               <div className="axis-monitor__header-center">
                 <div
@@ -217,7 +217,7 @@ export default function OperationStatus({
                 </div>
               </div>
               <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb2" style={{ color: theme.text }}>
-                速度 (mm/s)
+                速度 (deg/s)
               </span>
             </div>
 

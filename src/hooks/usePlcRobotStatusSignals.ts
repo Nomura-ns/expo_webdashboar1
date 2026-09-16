@@ -1,21 +1,25 @@
 // usePlcRobotStatusSignals.ts
 //
-// usePlcWebSocket から得た生データ(アドレス→値のマップ)を、RB1/RB2の
-// 「軸ごとのトルク値・ピーク値」「ロボット単位の稼働率」に変換するフック。
-// usePlcJobFlowSignals と同じ構成パターンに合わせています。
+// usePlcWebSocket から得た生データ（アドレス→値のマップ）を、
+// RB1/RB2の「軸ごとのトルク値・ピーク値」に変換するフック。
 //
-// !!! 注意 !!!
-// アドレス自体はまだ確定していません（config/robotStatusAddresses.ts 参照）。
-// 実データが来るまでは全て 0 を返します。
-// また、usePlcWebSocket が返す plcData の実際の型に合わせて
-// 「アドレス文字列 -> 数値」のマッピング部分は調整してください。
+// トルク値・ピーク値はPLC上で
+// 2ワード = 32bit signed integer
+// として格納されている前提。
+//
+// 稼働率はこのフックでは扱わない。
 
 import { useMemo } from 'react'
+
 import type { DataPoint } from '../types'
-import { getLatestDataPoint, readAddress } from '../utils/usePlcSignalUtils'
+
+import {
+  getLatestDataPoint,
+  read2WordSignedAddress,
+} from '../utils/usePlcSignalUtils'
+
 import {
   ROBOT_AXIS_ADDRESSES,
-  ROBOT_UTILIZATION_ADDRESS,
   type RobotKey,
 } from '../config/robotStatusAddresses'
 
@@ -27,31 +31,58 @@ export interface AxisTorqueStat {
 export interface PlcRobotStatusSignals {
   rb1AxisTorques: AxisTorqueStat[]
   rb2AxisTorques: AxisTorqueStat[]
-  rb1UtilizationRate: number
-  rb2UtilizationRate: number
 }
 
 /**
  * usePlcWebSocket の生データ（DataPoint[]）から、
- * RB1/RB2の軸トルク・ピーク値・稼働率を取り出す。
- * 使い方は usePlcJobFlowSignals(plcData) と同じ:
- *   const { rb1AxisTorques, ... } = usePlcRobotStatusSignals(plcData)
+ * RB1/RB2の各軸トルク・ピーク値を取り出す。
+ *
+ * 軸の並び：
+ *
+ * 0 = S
+ * 1 = L
+ * 2 = U
+ * 3 = R
+ * 4 = B
+ * 5 = T
+ *
+ * 例：
+ *
+ * RB1 S軸
+ * torque     → D15100～D15101
+ * peakTorque → D15120～D15121
+ *
+ * RB2 S軸
+ * torque     → D15140～D15141
+ * peakTorque → D15160～D15161
  */
-export function usePlcRobotStatusSignals(data: DataPoint[]): PlcRobotStatusSignals {
+export function usePlcRobotStatusSignals(
+  data: DataPoint[],
+): PlcRobotStatusSignals {
   return useMemo(() => {
     const latest = getLatestDataPoint(data)
 
-    const buildAxisStats = (robot: RobotKey): AxisTorqueStat[] =>
+    /**
+     * 指定したロボットの6軸分の
+     * 現在トルク / 最大トルクを取得する。
+     */
+    const buildAxisStats = (
+      robot: RobotKey,
+    ): AxisTorqueStat[] =>
       ROBOT_AXIS_ADDRESSES[robot].map((addr) => ({
-        torque: readAddress(latest, addr.torque),
-        peakTorque: readAddress(latest, addr.peakTorque),
+        torque: read2WordSignedAddress(
+          latest,
+          addr.torque,
+        ),
+        peakTorque: read2WordSignedAddress(
+          latest,
+          addr.peakTorque,
+        ),
       }))
 
     return {
       rb1AxisTorques: buildAxisStats('RB1'),
       rb2AxisTorques: buildAxisStats('RB2'),
-      rb1UtilizationRate: readAddress(latest, ROBOT_UTILIZATION_ADDRESS.RB1),
-      rb2UtilizationRate: readAddress(latest, ROBOT_UTILIZATION_ADDRESS.RB2),
     }
   }, [data])
 }

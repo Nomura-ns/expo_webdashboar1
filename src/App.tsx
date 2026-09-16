@@ -226,9 +226,7 @@ export default function App() {
 
   // RB1・RB2のトルク値・ピーク値・稼働率（PLC Dレジスタは未定のため現状は常に0が返る想定。
   // 確定するまではサンプル値をフォールバックとして使用する）
-  const { rb1AxisTorques, rb2AxisTorques, rb1UtilizationRate, rb2UtilizationRate } =
-    usePlcRobotStatusSignals(plcData)
-
+  const { rb1AxisTorques, rb2AxisTorques } = usePlcRobotStatusSignals(plcData)
   // 稼働実績5指標・NG判定信号・サイクルタイム（PLC Dレジスタは未定のため現状は常に0が返る想定。
   // 確定するまではサンプル値をフォールバックとして使用する。サイクルタイムはPLC値が
   // 無い場合、サイクル変更タイミング用bitの立上り間隔からコード側で算出した値を使用する）
@@ -255,23 +253,23 @@ export default function App() {
     }
   })
 
-  const robotRB1 = {
-    motors: SAMPLE_RB1_MOTORS.map((m, i) => ({
-      speed: m.speed,
-      torque: rb1AxisTorques[i]?.torque || m.torque,
-      peakTorque: rb1AxisTorques[i]?.peakTorque || m.peakTorque,
-    })),
-    utilizationRate: rb1UtilizationRate || SAMPLE_RB1_UTILIZATION,
-  }
+const robotRB1 = {
+  motors: SAMPLE_RB1_MOTORS.map((m, i) => ({
+    speed: m.speed,
+    torque: rb1AxisTorques[i]?.torque || m.torque,
+    peakTorque: rb1AxisTorques[i]?.peakTorque || m.peakTorque,
+  })),
+  utilizationRate: SAMPLE_RB1_UTILIZATION,
+}
 
-  const robotRB2 = {
-    motors: SAMPLE_RB2_MOTORS.map((m, i) => ({
-      speed: m.speed,
-      torque: rb2AxisTorques[i]?.torque || m.torque,
-      peakTorque: rb2AxisTorques[i]?.peakTorque || m.peakTorque,
-    })),
-    utilizationRate: rb2UtilizationRate || SAMPLE_RB2_UTILIZATION,
-  }
+const robotRB2 = {
+  motors: SAMPLE_RB2_MOTORS.map((m, i) => ({
+    speed: m.speed,
+    torque: rb2AxisTorques[i]?.torque || m.torque,
+    peakTorque: rb2AxisTorques[i]?.peakTorque || m.peakTorque,
+  })),
+  utilizationRate: SAMPLE_RB2_UTILIZATION,
+}
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

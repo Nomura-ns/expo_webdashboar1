@@ -110,11 +110,12 @@ export default function AdminResultsPanel({
     const chartW = 1200         // 640 → 1200：3日分でも間隔にゆとりが出る横幅に拡大
     const chartH = 260
     const padX = 60              // 36 → 60：左右の余白も少し拡大
-    const padY = 40
+    const padTop = 30
+    const padBottom = 90         // 日付ラベルが大きなHTML文字になったので、下の余白を広く確保
     const groupGap = 80          // 22 → 80：日付グループ同士の間隔を大きく広げる
-    const barGap = 6             // 3 → 6：カテゴリ同士の棒の間隔も少し広げる
+    const barGap = 10            // 3 → 10：カテゴリ同士の棒の間隔をさらに広げ、ラベル同士の被りを軽減
     const plotW = chartW - padX * 2
-    const plotH = chartH - padY * 2
+    const plotH = chartH - padTop - padBottom
     const dateCount = dateOptions.length
     const groupW = dateCount > 0 ? (plotW - groupGap * (dateCount - 1)) / dateCount : 0
     const barW =
@@ -123,14 +124,22 @@ export default function AdminResultsPanel({
     // 正解率の数値ラベル：SVG内のviewBoxスケールに引きずられないよう、
     // 位置だけ%で計算してHTMLオーバーレイとして描画する（フォントサイズはCSSの実px基準になる）
     const valueLabels: { key: string; xPct: number; yPct: number; value: number; color: string }[] = []
+    const dateLabels: { key: string; xPct: number; yPct: number; text: string }[] = []
     dateOptions.forEach((d, gi) => {
       const groupX = padX + gi * (groupW + groupGap)
+      dateLabels.push({
+        key: d.value,
+        xPct: ((groupX + groupW / 2) / chartW) * 100,
+        // 下の余白帯（baselineから下）の中央あたりに配置
+        yPct: ((padTop + plotH + padBottom * 0.55) / chartH) * 100,
+        text: d.value.slice(5).replace('-', '/'),
+      })
       CATEGORY_TABS.forEach((cat, ci) => {
         const rate = seriesData[cat]?.[gi]
         if (!rate) return
         const h = (rate.correctRate / 100) * plotH
         const x = groupX + ci * (barW + barGap) + barW / 2
-        const y = padY + (plotH - h) // ← バー上端（X方向のみ中央、Yはバーの上）
+        const y = padTop + (plotH - h) // ← バー上端（X方向のみ中央、Yはバーの上）
         valueLabels.push({
           key: `${d.value}-${cat}`,
           xPct: (x / chartW) * 100,
@@ -146,14 +155,18 @@ export default function AdminResultsPanel({
         <div className="admin-panel__modal admin-panel__modal--embedded">
           <div className="admin-panel__content admin-panel__lockview">
             <div className="admin-panel__chart-section">
-              <p className="admin-panel__chart-title">正解率推移</p>
+              
               <div className="admin-panel__chart-wrap">
-                <svg viewBox={`0 0 ${chartW} ${chartH}`} className="admin-panel__chart">
+                <svg
+                  viewBox={`0 0 ${chartW} ${chartH}`}
+                  preserveAspectRatio="none"
+                  className="admin-panel__chart"
+                >
                   <line
                     x1={padX}
-                    y1={padY + plotH}
+                    y1={padTop + plotH}
                     x2={chartW - padX}
-                    y2={padY + plotH}
+                    y2={padTop + plotH}
                     className="admin-panel__chart-baseline"
                   />
                   {dateOptions.map((d, gi) => {
@@ -164,7 +177,7 @@ export default function AdminResultsPanel({
                           const rate = seriesData[cat]?.[gi]
                           const h = rate ? (rate.correctRate / 100) * plotH : 0
                           const x = groupX + ci * (barW + barGap)
-                          const y = padY + (plotH - h)
+                          const y = padTop + (plotH - h)
                           return (
                             <rect
                               key={cat}
@@ -177,21 +190,15 @@ export default function AdminResultsPanel({
                             />
                           )
                         })}
-                        <text
-                          x={groupX + groupW / 2}
-                          y={chartH - 8}
-                          textAnchor="middle"
-                          className="admin-panel__chart-x-label"
-                        >
-                          {d.value.slice(5).replace('-', '/')}
-                        </text>
                       </g>
                     )
                   })}
                 </svg>
 
-                {/* 数値ラベルはSVGの外（HTML）に出す。グラフのviewBoxスケールに縮小されず、
-                    CSSのclamp/vwがそのまま実ピクセルで効くので、大画面モニタでも意図した大きさになる */}
+                {/* 数値ラベル・日付ラベルはどちらもSVGの外（HTML）に出す。preserveAspectRatio="none"で
+                    箱いっぱいに非均等スケールしているので、%指定の位置はそのまま正しく一致する。
+                    フォントサイズはCSSの実px（clamp/vw）指定がそのまま効くので、大画面モニタでも
+                    グラフの描画スケールに関係なく狙った大きさになる */}
                 <div className="admin-panel__chart-values">
                   {valueLabels.map((v) => (
                     <span
@@ -202,6 +209,15 @@ export default function AdminResultsPanel({
                       style={{ left: `${v.xPct}%`, top: `${v.yPct}%` }}
                     >
                       {v.value}
+                    </span>
+                  ))}
+                  {dateLabels.map((d) => (
+                    <span
+                      key={d.key}
+                      className="admin-panel__chart-date-label"
+                      style={{ left: `${d.xPct}%`, top: `${d.yPct}%` }}
+                    >
+                      {d.text}
                     </span>
                   ))}
                 </div>

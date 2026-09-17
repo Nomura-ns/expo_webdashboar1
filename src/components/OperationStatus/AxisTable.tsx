@@ -57,7 +57,7 @@ export default function AxisTable({
       <table className="axis-table">
         <thead>
           <tr>
-            <th rowSpan={2} style={{ color: theme.subtext, borderColor: theme.border }}>
+            <th rowSpan={2} className="axis-table__axis-head" style={{ color: theme.subtext, borderColor: theme.border }}>
               軸
             </th>
             <th colSpan={2} className="axis-table__group-head" style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
@@ -68,16 +68,16 @@ export default function AxisTable({
             </th>
           </tr>
           <tr>
-            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
+            <th style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
               速度
             </th>
-            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
+            <th style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
               トルク
             </th>
-            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
+            <th style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
               速度
             </th>
-            <th style={{ color: theme.subtext, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
+            <th style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
               トルク
             </th>
           </tr>
@@ -93,24 +93,24 @@ export default function AxisTable({
                 <td className="axis-table__label" style={{ color: theme.text, borderColor: theme.border }}>
                   {row.axisLabel ?? `軸${row.axis}`}
                 </td>
-                <td style={{ color: theme.text, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
+                <td style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}>
                   {row.rb1.speed}%
                 </td>
                 <td
                   className={isWarning ? 'axis-table__cell--warning' : undefined}
-                  style={{ color: theme.text, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}
+                  style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}
                 >
                   {row.rb1.torqueValue}% /{' '}
                   <span className={rb1PeakNear ? 'axis-table__peak-value--near' : undefined}>
                     {row.rb1.torquePeak}%
                   </span>
                 </td>
-                <td style={{ color: theme.text, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
+                <td style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}>
                   {row.rb2.speed}%
                 </td>
                 <td
                   className={isWarning ? 'axis-table__cell--warning' : undefined}
-                  style={{ color: theme.text, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}
+                  style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}
                 >
                   {row.rb2.torqueValue}% /{' '}
                   <span className={rb2PeakNear ? 'axis-table__peak-value--near' : undefined}>

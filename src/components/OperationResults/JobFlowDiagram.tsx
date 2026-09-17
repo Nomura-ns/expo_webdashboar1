@@ -288,10 +288,7 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
     return renderBox(p)
   }
 
-  const decisionPosition = positioned.find((p) => p.node.id === 'ov-d')
-  const replacementPosition = positioned.find((p) => p.node.id === 'ov-5')
-  const returnPosition = positioned.find((p) => p.node.id === 'ov-6')
-  const bypassExchange = resolvedChip?.label === 'OK' && decisionPosition && replacementPosition && returnPosition
+
 
   return (
     <div
@@ -309,8 +306,6 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
           {positioned.map((p) => renderNode(p))}
           {positioned.slice(0, -1).map((p, i) => {
             const next = positioned[i + 1]
-            const isSkippedExchangeEdge = bypassExchange && (p.node.id === 'ov-d' || p.node.id === 'ov-5')
-            if (isSkippedExchangeEdge) return null
             return (
               <line
                 key={`${p.node.id}-arrow`}
@@ -324,15 +319,6 @@ function FlowCanvas({ theme, nodes, sizing: s, markerId, activeStep, resolvedChi
               />
             )
           })}
-          {bypassExchange && (
-            <path
-              d={`M ${decisionPosition.right} ${rowCenterY} C ${decisionPosition.right + 30} ${rowCenterY - 70}, ${returnPosition.left - 30} ${rowCenterY - 70}, ${returnPosition.left} ${rowCenterY}`}
-              fill="none"
-              stroke={theme.accent}
-              strokeWidth={2}
-              markerEnd={`url(#${markerId})`}
-            />
-          )}
           {/* 現在工程を指すポインター。工程が進むとtransformのtransitionでスライド移動する
               （仕様書：フロー上を移動するポインター／工程移動時は滑らかに遷移） */}
           {focusTarget && (

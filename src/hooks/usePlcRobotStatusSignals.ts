@@ -27,10 +27,11 @@ export interface PlcRobotStatusSignals {
   rb2AxisStats: AxisFullStat[]
 }
 
-/** speedMaxが0（未取得等）の場合は0%として扱う */
+/** speedMaxが0（未取得等）の場合は0%として扱う。
+ * 表示側（SpeedBar等）が整数前提のため、ここで四捨五入して整数化する。 */
 function toSpeedPercent(current: number, max: number): number {
   if (!max) return 0
-  return (current / max) * 100
+  return Math.round((current / max) * 100)
 }
 
 export function usePlcRobotStatusSignals(

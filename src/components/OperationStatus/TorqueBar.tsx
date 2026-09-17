@@ -31,26 +31,22 @@ export default function TorqueBar({ side, value, peak, color }: Props) {
     width: `${pct(value)}%`,
     [anchorProp]: 0,
     background: color,
-    justifyContent: side === 'left' ? 'flex-end' : 'flex-start',
   } as CSSProperties
 
-  const peakStyle: CSSProperties = { [anchorProp]: `${pct(peak)}%` } as CSSProperties
   const peakColor = '#ffeb3b'
-  const peakLineColor = peakColor
 
   return (
     <div className={`torque-bar torque-bar--${side}`}>
       <div className="torque-bar__track">
-        <div className="torque-bar__fill" style={fillStyle}>
-          <span className="torque-bar__value">
-            {value}% /
-            <span className="torque-bar__peak-value" style={{ color: peakColor }}> {peak}%</span>
-          </span>
-        </div>
+        <div className="torque-bar__fill" style={fillStyle} />
+        {/* 数値ラベルはバー（fill）の幅に追従させず、隣接するSpeedBar側（外側）の
+           端に固定表示する。SpeedBar側の数値表示（ゲージ幅に関係なく固定位置）と
+           横位置がそろって見えるようにするための構成。 */}
+        <span className={`torque-bar__value torque-bar__value--${side}`}>
+          {value}% /
+          <span className="torque-bar__peak-value" style={{ color: peakColor }}> {peak}%</span>
+        </span>
       </div>
-
-      <div className="torque-bar__peak-tick" style={{ ...peakStyle, borderColor: peakLineColor }} />
-
     </div>
   )
 }

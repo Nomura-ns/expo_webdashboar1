@@ -10,9 +10,9 @@ function pad2(n: number) {
 }
 
 function format(d: Date) {
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad2(d.getHours())}:${pad2(
-    d.getMinutes(),
-  )}:${pad2(d.getSeconds())}`
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${pad2(
+    d.getHours(),
+  )}:${pad2(d.getMinutes())}`
 }
 
 export default function LiveClock() {

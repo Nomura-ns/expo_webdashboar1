@@ -529,40 +529,58 @@ export default function Sidebar({
         zIndex: 100,
         boxSizing: 'border-box',
       }}>
-        {mobilePages.map(page => {
-          const isActive = currentPage === page.key
-          return (
-            <button
-              key={page.key}
-              onClick={() => onPageChange(page.key)}
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '3px',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: 0,
-                color: isActive ? theme.accent : theme.subtext,
-              }}
-            >
-              <span style={{
-                width: '6px', height: '6px', borderRadius: '50%',
-                background: isActive ? theme.accent : theme.subtext,
-                opacity: isActive ? 1 : 0.5,
-              }} />
-              <span style={{
-                fontSize: '11px',
-                fontWeight: isActive ? 'bold' : 'normal',
-              }}>
-                {page.key === 'control' ? 'ROBOT PERM' : page.label}
-              </span>
-            </button>
-          )
-        })}
+{mobilePages.map(page => {
+  const isActive = currentPage === page.key
+
+  return (
+    <button
+      key={page.key}
+      onClick={() => onPageChange(page.key)}
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '3px',
+        background: 'transparent',
+        border: 'none',
+        cursor: 'pointer',
+        padding: 0,
+        color: isActive ? theme.accent : theme.subtext,
+      }}
+    >
+      <span
+        style={{
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          background: isActive ? theme.accent : theme.subtext,
+          opacity: isActive ? 1 : 0.5,
+        }}
+      />
+
+      <span
+        style={{
+          fontSize: '11px',
+          fontWeight: isActive ? 'bold' : 'normal',
+          textAlign: 'center',
+          lineHeight: '1.2',
+        }}
+      >
+        {page.label === 'Workflow/Operation History' ? (
+          <>
+            Workflow/Operation
+            <br />
+            History
+          </>
+        ) : (
+          page.label
+        )}
+      </span>
+    </button>
+     )
+    })}
       </nav>
     )
   }

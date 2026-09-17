@@ -371,12 +371,16 @@
   margin-bottom: clamp(8px, 1vw, 14px);
 }
 
-.admin-panel__modal--embedded .admin-panel__chart {
-  flex: 1 1 auto;
-  min-height: 0;
+.admin-panel__modal--embedded .admin-panel__chart-wrap {
+  flex: 0 0 auto;             /* 伸ばさない。高さは自分のaspect-ratioだけで決める */
   width: 100%;
-  aspect-ratio: 1200 / 260;   /* ← 追加。chartW / chartH と必ず一致させる */
-  height: auto;                /* ← height: 100% から変更。aspect-ratioに高さを委ねる */
+  aspect-ratio: 1200 / 260;   /* SVGのviewBoxと完全に一致させる（ここがズレるとラベル位置がズレる） */
+  min-height: 0;
+}
+
+.admin-panel__modal--embedded .admin-panel__chart {
+  width: 100%;
+  height: 100%;                /* wrap側で比率固定済みなので、そのまま埋めるだけでレターボックスが出ない */
 }
 
 /* ---- 棒グラフ（ロック画面用） ---- */
@@ -399,6 +403,52 @@
   font-size: clamp(16px, 2.0vw, 35px);
 }
 
+/* ---- グラフの数値ラベル（HTMLオーバーレイ版）----
+   SVGのviewBoxスケールに縮小されないよう、位置だけ%指定でSVGの上に重ねる。
+   フォントサイズはここで実px（clamp/vw）指定するので、大画面モニタでも
+   グラフ全体の描画幅に関係なく狙った大きさで表示される。 */
+.admin-panel__chart-wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-panel__chart-values {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.admin-panel__chart-value-label {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  padding-bottom: 4px;
+  font-size: clamp(12px, 1.4vw, 18px);
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+  text-shadow:
+    -1px -1px 2px rgba(0, 0, 0, 0.9),
+    1px -1px 2px rgba(0, 0, 0, 0.9),
+    -1px 1px 2px rgba(0, 0, 0, 0.9),
+    1px 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+/* 100（3桁）のときは隣のバーの数値と被りやすいので、少し縮めて字詰めする */
+.admin-panel__chart-value-label--long {
+  font-size: clamp(10px, 1.1vw, 14px);
+  letter-spacing: -0.03em;
+}
+
+.admin-panel__modal--embedded .admin-panel__chart-value-label {
+  font-size: clamp(16px, 2.4vw, 44px);
+}
+
+.admin-panel__modal--embedded .admin-panel__chart-value-label--long {
+  font-size: clamp(13px, 1.8vw, 32px);
+}
+
 /* ---- ロック画面（embedded時のみ）全体のレイアウト ---- */
 .admin-panel__lockview {
   display: flex;
@@ -414,10 +464,16 @@
   flex-direction: column;
 }
 
-.admin-panel__lockview .admin-panel__chart {
-  flex: 1 1 auto;
+.admin-panel__lockview .admin-panel__chart-wrap {
+  flex: 0 0 auto;             /* 伸ばさない。高さは自分のaspect-ratioだけで決める */
+  width: 100%;
+  aspect-ratio: 1200 / 260;   /* SVGのviewBoxと完全に一致させる（ここがズレるとラベル位置がズレる） */
   min-height: 0;
-  height: 100%;
+}
+
+.admin-panel__lockview .admin-panel__chart {
+  width: 100%;
+  height: 100%;                /* wrap側で比率固定済みなので、そのまま埋めるだけでレターボックスが出ない */
 }
 
 /* パスワード欄をロック画面の下部にインラインで表示 */

@@ -120,33 +120,54 @@ export default function AdminResultsPanel({
     const barW =
       dateCount > 0 ? (groupW - barGap * (CATEGORY_TABS.length - 1)) / CATEGORY_TABS.length : 0
 
-      
+    // 正解率の数値ラベル：SVG内のviewBoxスケールに引きずられないよう、
+    // 位置だけ%で計算してHTMLオーバーレイとして描画する（フォントサイズはCSSの実px基準になる）
+    const valueLabels: { key: string; xPct: number; yPct: number; value: number; color: string }[] = []
+    dateOptions.forEach((d, gi) => {
+      const groupX = padX + gi * (groupW + groupGap)
+      CATEGORY_TABS.forEach((cat, ci) => {
+        const rate = seriesData[cat]?.[gi]
+        if (!rate) return
+        const h = (rate.correctRate / 100) * plotH
+        const x = groupX + ci * (barW + barGap) + barW / 2
+        const y = padY + (plotH - h) // ← バー上端（X方向のみ中央、Yはバーの上）
+        valueLabels.push({
+          key: `${d.value}-${cat}`,
+          xPct: (x / chartW) * 100,
+          yPct: (y / chartH) * 100,
+          value: rate.correctRate,
+          color: CATEGORY_COLORS[cat],
+        })
+      })
+    })
+
     return (
       <div className="admin-panel__embed" style={themeVars}>
         <div className="admin-panel__modal admin-panel__modal--embedded">
           <div className="admin-panel__content admin-panel__lockview">
             <div className="admin-panel__chart-section">
               <p className="admin-panel__chart-title">正解率推移</p>
-              <svg viewBox={`0 0 ${chartW} ${chartH}`} className="admin-panel__chart">
-                <line
-                  x1={padX}
-                  y1={padY + plotH}
-                  x2={chartW - padX}
-                  y2={padY + plotH}
-                  className="admin-panel__chart-baseline"
-                />
-                {dateOptions.map((d, gi) => {
-                  const groupX = padX + gi * (groupW + groupGap)
-                  return (
-                    <g key={d.value}>
-                      {CATEGORY_TABS.map((cat, ci) => {
-                        const rate = seriesData[cat]?.[gi]
-                        const h = rate ? (rate.correctRate / 100) * plotH : 0
-                        const x = groupX + ci * (barW + barGap)
-                        const y = padY + (plotH - h)
-                        return (
-                          <g key={cat}>
+              <div className="admin-panel__chart-wrap">
+                <svg viewBox={`0 0 ${chartW} ${chartH}`} className="admin-panel__chart">
+                  <line
+                    x1={padX}
+                    y1={padY + plotH}
+                    x2={chartW - padX}
+                    y2={padY + plotH}
+                    className="admin-panel__chart-baseline"
+                  />
+                  {dateOptions.map((d, gi) => {
+                    const groupX = padX + gi * (groupW + groupGap)
+                    return (
+                      <g key={d.value}>
+                        {CATEGORY_TABS.map((cat, ci) => {
+                          const rate = seriesData[cat]?.[gi]
+                          const h = rate ? (rate.correctRate / 100) * plotH : 0
+                          const x = groupX + ci * (barW + barGap)
+                          const y = padY + (plotH - h)
+                          return (
                             <rect
+                              key={cat}
                               x={x}
                               y={y}
                               width={Math.max(barW, 0)}
@@ -154,31 +175,37 @@ export default function AdminResultsPanel({
                               rx={2}
                               style={{ fill: CATEGORY_COLORS[cat] }}
                             />
-                            {rate && (
-                              <text
-                                x={x + barW / 2}
-                                y={y - 8}
-                                textAnchor="middle"
-                                className="admin-panel__chart-bar-value"
-                              >
-                                {rate.correctRate}
-                              </text>
-                            )}
-                          </g>
-                        )
-                      })}
-                      <text
-                        x={groupX + groupW / 2}
-                        y={chartH - 8}
-                        textAnchor="middle"
-                        className="admin-panel__chart-x-label"
-                      >
-                        {d.value.slice(5).replace('-', '/')}
-                      </text>
-                    </g>
-                  )
-                })}
-              </svg>
+                          )
+                        })}
+                        <text
+                          x={groupX + groupW / 2}
+                          y={chartH - 8}
+                          textAnchor="middle"
+                          className="admin-panel__chart-x-label"
+                        >
+                          {d.value.slice(5).replace('-', '/')}
+                        </text>
+                      </g>
+                    )
+                  })}
+                </svg>
+
+                {/* 数値ラベルはSVGの外（HTML）に出す。グラフのviewBoxスケールに縮小されず、
+                    CSSのclamp/vwがそのまま実ピクセルで効くので、大画面モニタでも意図した大きさになる */}
+                <div className="admin-panel__chart-values">
+                  {valueLabels.map((v) => (
+                    <span
+                      key={v.key}
+                      className={`admin-panel__chart-value-label${
+                        String(v.value).length >= 3 ? ' admin-panel__chart-value-label--long' : ''
+                      }`}
+                      style={{ left: `${v.xPct}%`, top: `${v.yPct}%` }}
+                    >
+                      {v.value}
+                    </span>
+                  ))}
+                </div>
+              </div>
 
               <div className="admin-panel__legend">
                 {CATEGORY_TABS.map((cat) => (

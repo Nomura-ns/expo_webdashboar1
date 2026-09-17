@@ -15,10 +15,10 @@ export const THEMES: Record<ThemeKey, Theme> = {
 }
 
 export const PAGES = [
-  { key: 'dashboard' as const, label: 'MONITOR' },
-  { key: 'control' as const, label: 'ROBOT PERFORMANCE' },
-  { key: 'anomaly' as const, label: 'ROBOT STATUS' },
-  { key: 'quiz' as const, label: 'NAME PANEL' },
+  { key: 'dashboard' as const, label: 'OPERATION STATUS' },
+  { key: 'control' as const, label: 'WORKFLOW / OPERATION HISTORY ' },
+  { key: 'anomaly' as const, label: 'ROBOT MONITOR' },
+  { key: 'quiz' as const, label: 'ICON' },
 ]
 
 export function getThemeMode(themeKey: ThemeKey): ThemeMode {

@@ -27,7 +27,9 @@ export interface MetricPoint {
 type MetricKey = Exclude<keyof MetricPoint, 'date'>
 
 /** 異常回数・取付実行回数・取出実行回数の時系列推移点（横軸＝稼働時間）。
- *  PLCアドレス未定のため、指定が無い場合はサンプル値でフォールバック表示する */
+ *  PLCアドレス未定のため、指定が無い場合はサンプル値でフォールバック表示する。
+ *  time フィールドは元データのまま保持するが、実際の描画ラベルはPCの実時計から30分単位で
+ *  機械的に再生成するため、ここでの time の値自体は表示に直接使われない（値の並び順の目印として保持）。 */
 export interface HourlyTrendPoint {
   /** 時刻ラベル（例: '10:00'） */
   time: string
@@ -90,6 +92,11 @@ const HOURLY_PAD_T = 55
 const HOURLY_PAD_B = 50
 /** Y軸最大値の刻み幅。50→100→150…と、実データの最大値を超えるまで50刻みで切り上げる */
 const HOURLY_Y_STEP = 50
+/** 稼働時間推移グラフ：実際にラベル・線・マーカーを描く点数（30分間隔） */
+const HOURLY_VISIBLE_POINTS = 5
+
+/** 稼働時間がこの秒数（=0.5h）進むごとに表示範囲（直近5点）を更新する */
+const HOURLY_WINDOW_UPDATE_SEC = 1800
 
 /** グラフエリア（④）の自動切替間隔（ミリ秒） */
 const CAROUSEL_INTERVAL_MS = 180000
@@ -136,7 +143,8 @@ const STATUS_COLOR: Record<CycleStatus, string> = {
 }
 
 /** 異常回数・取付実行回数・取出実行回数の推移サンプル値（PLCアドレス確定まではこちらを表示）。
- *  横軸は10:00スタートの2時間を5ポイントに等分（30分刻み）。 */
+ *  横軸は10:00スタートの2時間を5ポイントに等分（30分刻み）。
+ *  ※実際の描画ラベルはPCの実時計から生成し直すため、ここの time はダミー値として扱われる。 */
 const SAMPLE_HOURLY_TREND: HourlyTrendPoint[] = [
   { time: '10:00', anomalyCount: 2, tightenCount: 18, loosenCount: 17 },
   { time: '10:30', anomalyCount: 4, tightenCount: 40, loosenCount: 38 },
@@ -160,6 +168,19 @@ function formatHms(sec?: number) {
 function formatOperatingHours(sec?: number) {
   if (sec === undefined || sec === null || sec < 0 || Number.isNaN(sec)) return '--h'
   return `${(sec / 3600).toFixed(1)}h`
+}
+
+/** 指定した時刻を30分単位に切り捨てて "HH:MM" ラベルを返す。
+ *  stepsBack を渡すと、そこから30分刻みで遡ったラベルを返す（直近点から過去方向へ生成する用途）。
+ *  これにより、元データ（PLCの記録タイミング）が多少ずれていても、横軸ラベルは必ず :00 か :30 になる。 */
+function roundToHalfHourLabel(date: Date, stepsBack = 0): string {
+  const totalMinutes = date.getHours() * 60 + date.getMinutes()
+  const roundedMinutes = Math.floor(totalMinutes / 30) * 30 - stepsBack * 30
+  const normalized = ((roundedMinutes % (24 * 60)) + 24 * 60) % (24 * 60)
+  const h = Math.floor(normalized / 60)
+  const m = normalized % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(h)}:${pad(m)}`
 }
 
 function computeMaxCount(values: number[][]): number {
@@ -276,7 +297,31 @@ export default function OperationResults({
   const inspectTotal = okNgTotals.reduce((sum, it) => sum + it.total, 0)
   const grandTotal = Math.max(inspectTotal, 1)
 
-  const hourlyData = hourlyTrend && hourlyTrend.length > 0 ? hourlyTrend : SAMPLE_HOURLY_TREND
+  /** 稼働時間推移（④の折れ線グラフ）：
+   *  ・実データ（hourlyTrend、30分間隔で蓄積される想定）から直近5点だけを表示範囲として切り出す
+   *  ・稼働時間（operatingTimeSec）が0.5h進むごとにこの範囲を更新する（30分未満の変化では再計算しない）
+   *  ・横軸ラベルは元データの time をそのまま使わず、PCの実時計を30分単位に切り捨てて機械的に
+   *    再生成する（:00 / :30 に必ず乗せるため。稼働時間ベースではなく実時間ベース）
+   *  ・末尾に非表示のダミー点を1点追加し、6点分の間隔で描画することで5点目のラベルが画面端で
+   *    見切れるのを防ぐ（ダミー点自体・そこへの線分・マーカーは描画しない） */
+  const hourlyWindowIndex =
+    operatingTimeSec !== undefined ? Math.floor(operatingTimeSec / HOURLY_WINDOW_UPDATE_SEC) : undefined
+
+  const hourlyData = useMemo(() => {
+    const source = hourlyTrend && hourlyTrend.length > 0 ? hourlyTrend : SAMPLE_HOURLY_TREND
+    const visible = source.slice(-HOURLY_VISIBLE_POINTS)
+    if (visible.length === 0) return visible
+
+    const now = new Date()
+    const labeled = visible.map((p, i) => ({
+      ...p,
+      time: roundToHalfHourLabel(now, visible.length - 1 - i),
+    }))
+
+    // 6点目：値は最終点を複製するが time は空文字にして非表示扱い（ラベル用の余白確保だけが目的）
+    return [...labeled, { ...labeled[labeled.length - 1], time: '' }]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hourlyTrend, hourlyWindowIndex])
 
   const hourlyItems: ChartItem[] = useMemo(
     () =>
@@ -294,10 +339,15 @@ export default function OperationResults({
   const hourlyGridLines = HOURLY_GRID_LINES
   const hourlyXAt = (i: number) => HOURLY_PAD_L + (hourlyPlotW / Math.max(hourlyData.length - 1, 1)) * i
   const hourlyYAt = (v: number) => HOURLY_PAD_T + hourlyPlotH - (Math.min(Math.max(v, 0), hourlyMaxY) / hourlyMaxY) * hourlyPlotH
-  const hourlySeries = hourlyItems.map((it) => ({
-    ...it,
-    points: it.values.map((v, i) => ({ x: hourlyXAt(i), y: hourlyYAt(v) })),
-  }))
+  const hourlySeries = hourlyItems.map((it) => {
+    const points = it.values.map((v, i) => ({ x: hourlyXAt(i), y: hourlyYAt(v) }))
+    return {
+      ...it,
+      points,
+      // 折れ線・マーカーは先頭5点分だけ描画（＝6点目への線分と6点目自体のマーカーは非表示）
+      visiblePoints: points.slice(0, HOURLY_VISIBLE_POINTS),
+    }
+  })
 
   const handleColorChange = (id: string, color: string) => {
     setCustomColors((prev) => ({ ...prev, [id]: color }))
@@ -317,7 +367,9 @@ export default function OperationResults({
         const availableH = outer.clientHeight
         const naturalH = inner.offsetHeight
         if (availableH <= 0 || naturalH <= 0) return
-        const next = Math.min(Math.max(availableH / naturalH, 0.55), 1.6)
+        // モバイルは表示内容が多く、フォントが小さくなっても1画面に収めることを優先するため、
+        // 下限スケールをデスクトップ（0.55）よりも大幅に低く設定する
+        const next = Math.min(Math.max(availableH / naturalH, isMobile ? 0.32 : 0.55), 1.6)
         setContentScale((prev) => (Math.abs(prev - next) > 0.01 ? next : prev))
       })
     }
@@ -662,22 +714,26 @@ export default function OperationResults({
                 </g>
               )
             })}
-            {hourlyData.map((p, i) => (
-              <text
-                key={p.time}
-                x={hourlyXAt(i)}
-                y={HOURLY_CHART_H - 8}
-                textAnchor="middle"
-                fontSize={CHART_AXIS_FONT_SIZE}
-                fill={theme.subtext}
-              >
-                {p.time}
-              </text>
-            ))}
+            {hourlyData.map((p, i) => {
+              const isLast = i === hourlyData.length - 1
+              return (
+                <text
+                  key={`${p.time}-${i}`}
+                  x={hourlyXAt(i)}
+                  y={HOURLY_CHART_H - 8}
+                  textAnchor="middle"
+                  fontSize={CHART_AXIS_FONT_SIZE}
+                  fill={theme.subtext}
+                  opacity={isLast ? 0 : 1}
+                >
+                  {p.time}
+                </text>
+              )
+            })}
             {hourlySeries.map((s) => (
               <g key={s.id}>
-                <polyline points={s.points.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={s.color} strokeWidth={3} />
-                {s.points.map((p, i) => (
+                <polyline points={s.visiblePoints.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={s.color} strokeWidth={3} />
+                {s.visiblePoints.map((p, i) => (
                   <circle key={i} cx={p.x} cy={p.y} r={4} fill={s.color}>
                     <title>{`${hourlyData[i].time} ${s.label}: ${s.values[i]}回`}</title>
                   </circle>
@@ -749,9 +805,12 @@ export default function OperationResults({
               {isMobile ? (
                 <>
                   {/* モバイル：フローは簡易ボックス表示、各回数・OK/NG・稼働率も同じボックス形式で縦積み
-                      （横スクロールKPIやドーナツ／棒・折れ線グラフは可読性のため廃止） */}
+                      （横スクロールKPIやドーナツ／棒・折れ線グラフは可読性のため廃止）。
+                      サイクル履歴も含めて全てスケール対象に含めることで、内容量が多い場合でも
+                      1画面に収まるよう自動的に縮小される（フォントサイズは小さくなってよい）。 */}
                   <JobFlowDiagram theme={theme} activeStep={activeStep} ngSignal={ngSignal} />
                   {mobileStatsList}
+                  <div className="op-results__cycle-wrap">{cycleSection}</div>
                 </>
               ) : (
                 <>
@@ -773,9 +832,6 @@ export default function OperationResults({
               )}
             </div>
           </div>
-
-          {/* モバイル版のみ：サイクル履歴をスケール対象外の最下部にボックス表示 */}
-          {isMobile && <div className="op-results__cycle-wrap">{cycleSection}</div>}
         </div>
 
         {isEditing && !isMobile && (

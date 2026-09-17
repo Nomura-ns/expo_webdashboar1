@@ -3,6 +3,11 @@
 // usePlcJobFlowSignals / usePlcRobotStatusSignals と同じ構成に統一しています。
 // usePlcWebSocket が返す data（DataPoint[]、1時刻分ずつ蓄積された配列）を受け取り、
 // 最新の1点から readAddress（usePlcSignalUtils）経由で値を取り出します。
+//
+// OK/NGはPLCからは「割合（%）」でしか来ないため、検査回数（OK回数＋NG回数）との整合を
+// 取るためにここで回数へ変換します。OK割合・NG割合をそれぞれ四捨五入すると
+// 合計が検査回数と一致しないことがあるため、OK回数のみ四捨五入で算出し、
+// NG回数は「検査回数－OK回数」で求めることで必ず内訳の合計が検査回数と一致するようにしています。
 
 import { useEffect, useRef, useState } from 'react'
 import type { DataPoint } from '../types'
@@ -13,6 +18,7 @@ import {
   INSERT_COUNT_ADDRESS,
   TIGHTEN_COUNT_ADDRESS,
   LOOSEN_COUNT_ADDRESS,
+  OK_RATIO_ADDRESS,
   NG_SIGNAL_ADDRESS,
   CYCLE_CHANGE_BIT_ADDRESS,
   CYCLE_TIME_ADDRESS,
@@ -29,6 +35,10 @@ export interface PlcOperationMetrics {
   tightenCount: number
   /** 取出実行回数 */
   loosenCount: number
+  /** 検査OK回数（検査回数×OK割合から算出） */
+  okCount: number
+  /** 検査NG回数（検査回数－OK回数から算出。OK割合の丸め誤差の影響を受けない） */
+  ngCount: number
   /** NG判定信号（true = NG） */
   ngSignal: boolean
   /** サイクルタイム（秒）。PLC値があればそれを優先し、無ければコード側の蓄積値を使用 */
@@ -47,9 +57,15 @@ export function usePlcOperationMetricsSignals(data: DataPoint[]): PlcOperationMe
   const insertCount = readAddress(latest, INSERT_COUNT_ADDRESS)
   const tightenCount = readAddress(latest, TIGHTEN_COUNT_ADDRESS)
   const loosenCount = readAddress(latest, LOOSEN_COUNT_ADDRESS)
+  const okRatio = readAddress(latest, OK_RATIO_ADDRESS)
   const ngSignal = readAddress(latest, NG_SIGNAL_ADDRESS) === 1
   const cycleChangeBit = readAddress(latest, CYCLE_CHANGE_BIT_ADDRESS)
   const plcCycleTimeSec = readAddress(latest, CYCLE_TIME_ADDRESS)
+
+  // OK割合（%）×検査回数からOK回数を算出。NG回数は「検査回数－OK回数」で求める
+  // （OK割合・NG割合を個別に四捨五入すると合計が検査回数からズレることがあるため）。
+  const okCount = Math.round(inspectCount * (okRatio / 100))
+  const ngCount = Math.max(inspectCount - okCount, 0)
 
   // サイクル変更タイミング用bitの立上り（0→1）を検知し、
   // 直前の立上りからの経過秒数を「サイクルタイム」としてコード側で蓄積するフォールバック処理。
@@ -68,5 +84,15 @@ export function usePlcOperationMetricsSignals(data: DataPoint[]): PlcOperationMe
 
   const cycleTimeSec = plcCycleTimeSec > 0 ? plcCycleTimeSec : accumulatedCycleSec
 
-  return { inspectCount, anomalyCount, insertCount, tightenCount, loosenCount, ngSignal, cycleTimeSec }
+  return {
+    inspectCount,
+    anomalyCount,
+    insertCount,
+    tightenCount,
+    loosenCount,
+    okCount,
+    ngCount,
+    ngSignal,
+    cycleTimeSec,
+  }
 }

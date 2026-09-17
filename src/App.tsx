@@ -11,9 +11,10 @@ import NameplateQuiz from './components/NameplateQuiz/NameplateQuiz'
 import LiveClock from './components/OperationStatus/LiveClock'
 import { usePlcWebSocket } from './hooks/usePlcWebSocket' 
 import { useIsMobile } from './hooks/useMediaQuery'
-import { usePlcJobFlowSignals, JOB_FLOW_STEP_ADDRESS, JOB_FLOW_CYCLE_CURRENT_ADDRESS, JOB_FLOW_CYCLE_TOTAL_ADDRESS,} from './hooks/usePlcJobFlowSignals'
 import { usePlcRobotStatusSignals } from './hooks/usePlcRobotStatusSignals'
 import { usePlcOperationMetricsSignals } from './hooks/usePlcOperationMetricsSignals'
+import { useOperationHourlyTrend } from './hooks/useOperationHourlyTrend' 
+import { usePlcJobFlowSignals, JOB_FLOW_ADDRESSES } from './hooks/usePlcJobFlowSignals'
 import { OPERATION_METRICS_ADDRESSES } from './config/operationMetricsAddresses'
 import { getRecentDates, METRIC_DAYS } from './utils/dateRange'
 import { ALL_ROBOT_STATUS_ADDRESSES } from './config/robotStatusAddresses'
@@ -199,12 +200,10 @@ export default function App() {
     isPlaying: true,
     intervalSec: 0.5,
     selectedAddresses: [
-  JOB_FLOW_STEP_ADDRESS,
-  JOB_FLOW_CYCLE_CURRENT_ADDRESS,
-  JOB_FLOW_CYCLE_TOTAL_ADDRESS,
-  ...OPERATION_METRICS_ADDRESSES,
-  ...ALL_ROBOT_STATUS_ADDRESSES,
-  ],
+      ...ALL_ROBOT_STATUS_ADDRESSES,
+      ...OPERATION_METRICS_ADDRESSES,
+      ...JOB_FLOW_ADDRESSES,
+    ],
   })
 
   const { activeStep } = usePlcJobFlowSignals(plcData)
@@ -218,14 +217,18 @@ export default function App() {
   // inspectCountはPLC側の検査回数信号（アドレスはoperationMetricsAddresses.ts参照）。
   // 表示上の検査回数はOK回数＋NG回数から算出するようになったためMetricPointへは反映しないが、
   // 信号自体は将来的な用途に備えてそのまま受け取っておく。
-  const {
+   const {
     anomalyCount,
     insertCount,
     tightenCount,
     loosenCount,
+    okCount,
+    ngCount,
     ngSignal,
     cycleTimeSec,
   } = usePlcOperationMetricsSignals(plcData)
+  
+  const hourlyTrendPoints = useOperationHourlyTrend(anomalyCount, tightenCount, loosenCount)
 
   // 当日分（配列末尾）はPLCの値があればそちらを優先し、無ければサンプル値を使う
   const liveMetrics: MetricPoint[] = sampleMetrics.map((m, i) => {
@@ -236,6 +239,8 @@ export default function App() {
       insertCount: insertCount || m.insertCount,
       tightenCount: tightenCount || m.tightenCount,
       loosenCount: loosenCount || m.loosenCount,
+      okCount: okCount || m.okCount,
+      ngCount: ngCount || m.ngCount,
     }
   })
 
@@ -312,17 +317,16 @@ const robotRB2 = {
         className="app-header"
         style={{ borderBottom: `1px solid ${theme.border}` }}
       >
-        <div
-         className="app-header__brand"
-         style={{
-          background: sidebarOpen
-          ? mode === 'dark'
-            ? 'rgba(0,0,0,0.55)'   // ← オーバーレイと同じ暗さ
-            : 'rgba(180, 178, 178, 0.46)'
-          : theme.bg,
-          transition: 'background 0.1s ease',
-         }}
-         >
+        <div className="app-header__brand" 
+         style={{ background: isMobile 
+           ? theme.bg 
+           : sidebarOpen 
+             ? mode === 'dark' 
+               ? 'rgba(0,0,0,0.55)' 
+               : 'rgba(180, 178, 178, 0.46)'
+             : theme.bg, transition: 'background 0.1s ease', 
+             }} 
+            >
           <img src={theme.logo} alt="logo" className="logo" />
        </div>
 
@@ -462,7 +466,7 @@ const robotRB2 = {
            activeStep={activeStep}
            overallCycleTimeSec={cycleTimeSec}
            ngSignal={ngSignal}
-           // 刃物画像：RB1/RB2で共通のためSHARED_ROBOT_IMAGE_URLを流用（実画像が別途決まれば差し替え）
+           hourlyTrend={hourlyTrendPoints}
            bladeImageUrl={SHARED_ROBOT_IMAGE_URL}
            onEditingChange={setIsEditing}
          />
@@ -513,11 +517,15 @@ const robotRB2 = {
       color: theme.text,
       fontSize: '20px',
       letterSpacing: '0.5px',
+      fontFamily: '"Yu Gothic", "游ゴシック", sans-serif',
+      fontWeight: 300,
+      fontStyle: 'italic',
     }}
-   >
+  >
+
     e
     <span style={{ color: theme.accent }}>X</span>
-    <span style={{ marginRight: '10px' }}>ight</span>
+    <span style={{ marginRight: '15px' }}>ight</span>
    </span>
   </footer>
     </div>

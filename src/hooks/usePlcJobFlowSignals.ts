@@ -1,38 +1,34 @@
-// usePlcJobFlowSignals.ts
-import { useMemo } from 'react'
+// hooks/usePlcJobFlowSignals.ts
+//
+// 全体フロー（ROBOT PERFORMANCE）の現在工程ステップをPLC(Dレジスタ)から取得するための
+// アドレス定義とフック。usePlcOperationMetricsSignals / usePlcRobotStatusSignals と
+// 同じ構成に統一しています。
+//
+// D15004の値と工程の対応（JobFlowDiagram.tsxのOVERALL_FLOWと対応させること）：
+// 1：刃物取付 / 2：刃物取外 / 3：検査 / 4：検査結果OK？ / 5：刃物交換 /
+// 6：刃物ストックへ返却 / 7：動作準備
+
+import { getLatestDataPoint, readAddress } from '../utils/usePlcSignalUtils'
 import type { DataPoint } from '../types'
-import { getLatestDataPoint, readAddressOrUndefined } from '../utils/usePlcSignalUtils'
 
-/**
- * 工程フロー図（JobFlowDiagram）で使用するPLCアドレス。
- * usePlcQuizSignals と同じ形式（数値アドレス）で定義してください。
- * 実際のラダー側のアドレス番号に合わせて書き換えてください。
- */
-export const JOB_FLOW_STEP_ADDRESS = 110          // 現在工程ステップ
-export const JOB_FLOW_CYCLE_CURRENT_ADDRESS = 111 // 現在サイクル数
-export const JOB_FLOW_CYCLE_TOTAL_ADDRESS = 112   // 全体サイクル数（目標・予定回数）
+/** 全体フローの現在工程ステップ（D15004） */
+export const JOB_FLOW_STEP_ADDRESS = 15004
 
-type JobFlowSignals = {
-  activeStep?: number
-  cycleCurrent?: number
-  cycleTotal?: number
+/** usePlcWebSocket の selectedAddresses にまとめて渡すための一覧 */
+export const JOB_FLOW_ADDRESSES = [JOB_FLOW_STEP_ADDRESS]
+
+export interface PlcJobFlow {
+  /** 全体フローの現在工程ステップ（1〜7）。未割り当て（0）時は undefined */
+  activeStep: number | undefined
 }
 
-/**
- * usePlcWebSocket の生データ（DataPoint[]）から、
- * 工程フロー図が必要とする値（現在ステップ・サイクル進捗）を取り出す。
- * 使い方は usePlcQuizSignals(plcData) と同じ:
- *   const { activeStep, cycleCurrent, cycleTotal } = usePlcJobFlowSignals(plcData)
- */
-export function usePlcJobFlowSignals(data: DataPoint[]): JobFlowSignals {
-  return useMemo(() => {
-    const latest = getLatestDataPoint(data)
-    if (!latest) return {}
+export function usePlcJobFlowSignals(data: DataPoint[]): PlcJobFlow {
+  const latest = getLatestDataPoint(data)
+  const rawStep = readAddress(latest, JOB_FLOW_STEP_ADDRESS)
 
-    return {
-      activeStep: readAddressOrUndefined(latest, JOB_FLOW_STEP_ADDRESS),
-      cycleCurrent: readAddressOrUndefined(latest, JOB_FLOW_CYCLE_CURRENT_ADDRESS),
-      cycleTotal: readAddressOrUndefined(latest, JOB_FLOW_CYCLE_TOTAL_ADDRESS),
-    }
-  }, [data])
+  // readAddressは未取得時に0を返すため、0はステップ未割り当てとして扱いundefinedにする
+  // （JobFlowDiagram側のactiveStep?: numberは「どの工程も強調しない」状態として扱う）
+  const activeStep = rawStep > 0 ? rawStep : undefined
+
+  return { activeStep }
 }

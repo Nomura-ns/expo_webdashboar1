@@ -32,8 +32,6 @@ const MAX_CAMERAS = 8
 
 // メイン画面で正常時にカメラを自動切替する間隔
 const ROTATE_INTERVAL_MS = 6000
-// 時刻表示の更新間隔
-const CLOCK_INTERVAL_MS = 1000
 
 // カメラの状態は正常 / 異常の2値で管理する
 type CameraStatus = '運転' | '異常' | '待機' |'停止'
@@ -119,14 +117,6 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
   // --- デスクトップ：メイン画面で正常時に自動巡回表示するカメラのインデックス ---
   const [monitorIndex, setMonitorIndex] = useState(0)
 
-  // --- 現在時刻（カメラ表示内オーバーレイ用） ---
-  const [now, setNow] = useState(() => new Date())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), CLOCK_INTERVAL_MS)
-    return () => window.clearInterval(timer)
-  }, [])
-
   // カメラが削除されるなどして台数が減った場合、表示中インデックスがはみ出さないよう補正
   useEffect(() => {
     setActiveCameraIndex(prev => Math.min(prev, Math.max(0, cameras.length - 1)))
@@ -156,6 +146,9 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
 
   const canvasBg = isLightColor(theme.bg) ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.14)'
   const abnormalColor = isLightColor(theme.bg) ? ABNORMAL_COLOR_LIGHT : ABNORMAL_COLOR_DARK
+  // RB1/RB2統合ステータスカード（ガラス風）用の色。テーマの明暗で出し分ける
+  const glassBg = isLightColor(theme.bg) ? 'rgba(0, 0, 0, 0.05)' : 'rgba(255, 255, 255, 0.08)'
+  const glassBorder = isLightColor(theme.bg) ? 'rgba(0, 0, 0, 0.14)' : 'rgba(255, 255, 255, 0.18)'
 
   const abnormalCameras = cameras.filter(cam => cam.status === '異常')
   const singleAbnormalCamera = abnormalCameras.length === 1 ? abnormalCameras[0] : null
@@ -184,53 +177,6 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
   // --- モバイル：ステータスボックスに表示する「現在タブのカメラ」 ---
   const activeCamera = cameras[clampedActiveIndex] ?? cameras[0]
 
-  // --- 各カメラが「画面に表示され始めてから」の経過時間を管理 ---
-  const recordStartTimesRef = useRef<Record<string, number>>({})
-
-  const visibleCameraIds = isMobile
-   ? (activeCamera ? [activeCamera.id] : [])
-   : isSplitView
-     ? abnormalCameras.map(cam => cam.id)
-     : (displayCamera ? [displayCamera.id] : [])
-
-  useEffect(() => {
-    const store = recordStartTimesRef.current
-    const visibleSet = new Set(visibleCameraIds)
-
-   // 新しく表示されたカメラの開始時刻を記録
-   visibleCameraIds.forEach(id => {
-    if (!store[id]) store[id] = Date.now()
-   })
-
-   // 画面から消えたカメラは記録を破棄（次回表示時に0からカウントし直す）
-   Object.keys(store).forEach(id => {
-    if (!visibleSet.has(id)) delete store[id]
-   })
-   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleCameraIds.join(',')])
-
-  const formatElapsed = (id: string) => {
-   const start = recordStartTimesRef.current[id]
-   if (!start) return '00:00'
-   const diffSec = Math.max(0, Math.floor((now.getTime() - start) / 1000))
-   const hh = Math.floor(diffSec / 3600)
-   const mm = Math.floor((diffSec % 3600) / 60)
-   const ss = diffSec % 60
-   const pad = (n: number) => String(n).padStart(2, '0')
-   return hh > 0 ? `${pad(hh)}:${pad(mm)}:${pad(ss)}` : `${pad(mm)}:${pad(ss)}`
-  }
-
- // 枠の外側に置くREC＋経過時間バー
-  const renderRecBar = (cam: CameraFeed) => (
-   <div className="robot-dashboard__camera-rec-bar">
-    <span className="robot-dashboard__camera-rec">
-      <span className="robot-dashboard__camera-rec-dot" />
-      REC
-    </span>
-    <span className="robot-dashboard__camera-clock">{formatElapsed(cam.id)}</span>
-  </div>
- )
-  
   // --- モバイル：タブクリック → 表示カメラを切り替え ---
   const scrollToCameraIndex = (index: number) => {
     setActiveCameraIndex(index)
@@ -313,7 +259,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
   )
 }
 
-  // --- 完了工程（PLCから工程完了/開始のたびに信号が来るイメージのテスト操作） ---
+  // --- 工程（PLCから工程完了/開始のたびに信号が来るイメージのテスト操作） ---
   const adjustCompletedSteps = (id: string, delta: number) => {
     setCameras(prev =>
       prev.map(cam => {
@@ -362,7 +308,12 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
     <PanelFrame className="robot-dashboard">
       <div
         className={`robot-dashboard__body${isEditing ? ' is-editing' : ''}`}
-        style={{ '--canvas-bg': canvasBg, '--abnormal-color': abnormalColor } as React.CSSProperties}
+        style={{
+          '--canvas-bg': canvasBg,
+          '--abnormal-color': abnormalColor,
+          '--glass-bg': glassBg,
+          '--glass-border': glassBorder,
+        } as React.CSSProperties}
       >
         {isMobile ? (
           /* --- モバイル版：1台だけ表示し、上部タブ or 横スクロールで切替 --- */
@@ -416,10 +367,12 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                     </span>
                   </span>
                   <span className="robot-dashboard__mobile-status-info-item">
-                    <span className="robot-dashboard__mobile-status-info-label">完了工程</span>
-                    <span>
-                      {activeCamera.processContent || '-'} / {activeCamera.completedSteps ?? 0} / {activeCamera.totalSteps ?? 0}
-                    </span>
+                    <span className="robot-dashboard__mobile-status-info-label">工程内容</span>
+                    <span>{activeCamera.processContent || '-'}</span>
+                  </span>
+                  <span className="robot-dashboard__mobile-status-info-item">
+                    <span className="robot-dashboard__mobile-status-info-label">進捗</span>
+                    <span>{activeCamera.completedSteps ?? 0} / {activeCamera.totalSteps ?? 0}</span>
                   </span>
                 </div>
               </div>
@@ -430,14 +383,11 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                 const isAbnormal = cam.status === '異常'
                 return (
                   <div key={cam.id} className="robot-dashboard__mobile-page">
-                    <div className="robot-dashboard__mobile-frame-wrap">
-                      <div
-                        className={`robot-dashboard__mobile-frame${isAbnormal ? ' is-abnormal' : ' is-normal'}`}
-                        style={{ borderColor: isAbnormal ? undefined : theme.border }}
-                      >
-                        {renderCameraContent(cam)}
-                      </div>
-                      {renderRecBar(cam)}
+                    <div
+                      className={`robot-dashboard__mobile-frame${isAbnormal ? ' is-abnormal' : ' is-normal'}`}
+                      style={{ borderColor: isAbnormal ? undefined : theme.border }}
+                    >
+                      {renderCameraContent(cam)}
                     </div>
                    </div>
                  )
@@ -445,10 +395,40 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
             </div>
           </div>
         ) : (
-          /* --- デスクトップ版：ステータスカード + メインカメラモニター --- */
+          /* --- デスクトップ版：メインカメラモニター + 右端の縦長ステータスカード --- */
           <div className="robot-dashboard__monitor">
-            <div className="robot-dashboard__status-row">
-              {cameras.map((cam, i) => {
+            <div className="robot-dashboard__monitor-stage" style={{ background: canvasBg }}>
+              {isSplitView ? (
+                <div className="robot-dashboard__split-grid">
+                  {abnormalCameras.map(cam => (
+                    <div key={cam.id} className="robot-dashboard__camera-frame is-abnormal">
+                      {renderCameraContent(cam)}
+                    </div>
+                   ))}
+                </div>
+              ) : (
+                <>
+                  {displayCamera && (
+                     <div
+                       className={`robot-dashboard__camera-frame robot-dashboard__camera-frame--main${
+                         singleAbnormalCamera ? ' is-abnormal' : ' is-normal'
+                       }`}
+                       style={{ borderColor: singleAbnormalCamera ? undefined : theme.border }}
+                     >
+                       {renderCameraContent(displayCamera)}
+                     </div>
+                   )}
+                </>
+              )}
+                <span className="robot-dashboard__recording-indicator" aria-label="録画中">
+                  ●REC
+                </span>
+            </div>
+
+            {/* 右端：縦長のステータスカード列 */}
+            <div className="robot-dashboard__status-col" style={{ background: canvasBg }}>
+              {/* RB1・RB2以外（3台目以降）は従来どおり個別カードで表示 */}
+              {cameras.slice(2).map(cam => {
                 const isAbnormal = cam.status === '異常'
                 return (
                   <div
@@ -456,52 +436,53 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                     className="robot-dashboard__info-card"
                     style={{ background: theme.headerBg, borderColor: theme.border }}
                   >
-                    <div className="robot-dashboard__info-card-header">
-                      {i === 0 ? 'RB1' : i === 1 ? 'RB2' : cam.label}
-                    </div>
+                    <div className="robot-dashboard__info-card-header">{cam.label}</div>
                     <div className="robot-dashboard__info-row">
                       <span className="robot-dashboard__info-row-label">状態</span>
                       <span className={isAbnormal ? 'is-abnormal' : 'is-normal'}>{cam.status}</span>
                     </div>
                     <div className="robot-dashboard__info-row">
-                      <span className="robot-dashboard__info-row-label">完了工程</span>
-                      <span>
-                        {cam.processContent || '-'} / {cam.completedSteps ?? 0} / {cam.totalSteps ?? 0}
-                      </span>
+                      <span className="robot-dashboard__info-row-label">工程内容</span>
+                      <span>{cam.processContent || '-'}</span>
+                    </div>
+                    <div className="robot-dashboard__info-row">
+                      <span className="robot-dashboard__info-row-label">進捗</span>
+                      <span>{cam.completedSteps ?? 0} / {cam.totalSteps ?? 0}</span>
                     </div>
                   </div>
                 )
               })}
-            </div>
 
-            <div className="robot-dashboard__monitor-stage" style={{ background: canvasBg }}>
-              {isSplitView ? (
-                <div className="robot-dashboard__split-grid">
-                  {abnormalCameras.map(cam => (
-                    <div key={cam.id} className="robot-dashboard__camera-frame-wrap">
-                      <div className="robot-dashboard__camera-frame is-abnormal">
-                        {renderCameraContent(cam)}
-                      </div>
-                      {renderRecBar(cam)}
-                    </div>
-                   ))}
+              {/* RB1・RB2をまとめた1枚のガラス風ステータスカード（縦長） */}
+              {(cameras[0] || cameras[1]) && (
+                <div className="robot-dashboard__rb-status-card">
+                  {[cameras[0], cameras[1]]
+                    .filter((cam): cam is CameraFeed => Boolean(cam))
+                    .map((cam, i) => {
+                      const isAbnormal = cam.status === '異常'
+                      return (
+                        <div className="robot-dashboard__rb-status-block" key={cam.id}>
+                          <div className="robot-dashboard__info-card-header">
+                            {i === 0 ? 'RB1' : 'RB2'}
+                          </div>
+                          <div className="robot-dashboard__info-row">
+                            <span className="robot-dashboard__info-row-label">状態</span>
+                            <span className={isAbnormal ? 'is-abnormal' : 'is-normal'}>
+                              {cam.status}
+                            </span>
+                          </div>
+                          <div className="robot-dashboard__info-row">
+                            <span className="robot-dashboard__info-row-label">工程内容</span>
+                            <span>{cam.processContent || '-'}</span>
+                          </div>
+                          <div className="robot-dashboard__info-row">
+                            <span className="robot-dashboard__info-row-label">進捗</span>
+                            <span>{cam.completedSteps ?? 0} / {cam.totalSteps ?? 0}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
                 </div>
-              ) : (
-                <>
-                  {displayCamera && (
-                     <div className="robot-dashboard__camera-frame-wrap">
-                       <div
-                         className={`robot-dashboard__camera-frame robot-dashboard__camera-frame--main${
-                           singleAbnormalCamera ? ' is-abnormal' : ' is-normal'
-                         }`}
-                         style={{ borderColor: singleAbnormalCamera ? undefined : theme.border }}
-                       >
-                         {renderCameraContent(displayCamera)}
-                       </div>
-                       {renderRecBar(displayCamera)}
-                     </div>
-                   )}
-                </>
               )}
             </div>
            </div>
@@ -675,7 +656,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                       </button>
 
                       <div className="robot-dashboard__field">
-                        <span>完了工程</span>
+                        <span>工程</span>
                         <div className="robot-dashboard__toolbar-row">
                           <button
                             type="button"

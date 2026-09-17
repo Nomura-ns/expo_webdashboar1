@@ -6,11 +6,10 @@ import { useCycleHistory, type CycleStatus } from '../../hooks/useCycleHistory'
 import type { Theme } from '../../types'
 import './OperationResults.css'
 
-/** 稼働実績（検査回数・異常回数・上刃挿入回数・取付実行回数・取出実行回数・検査OK/NG）の日別データ */
+/** 稼働実績（異常回数・上刃挿入回数・取付実行回数・取出実行回数・検査OK/NG）の日別データ。
+ *  検査回数は「OK回数＋NG回数」から算出するため、専用フィールドは持たない（円グラフ脇のラベルにのみ表示）。 */
 export interface MetricPoint {
   date: string
-  /** 検査回数 */
-  inspectCount: number
   /** 異常回数 */
   anomalyCount: number
   /** 上刃挿入回数 */
@@ -27,10 +26,14 @@ export interface MetricPoint {
 
 type MetricKey = Exclude<keyof MetricPoint, 'date'>
 
-/** 10秒稼働率の推移点。PLCアドレス未定のため、指定が無い場合はサンプル値でフォールバック表示する */
-export interface UtilizationPoint {
-  label: string
-  rate: number
+/** 異常回数・取付実行回数・取出実行回数の時系列推移点（横軸＝稼働時間）。
+ *  PLCアドレス未定のため、指定が無い場合はサンプル値でフォールバック表示する */
+export interface HourlyTrendPoint {
+  /** 時刻ラベル（例: '10:00'） */
+  time: string
+  anomalyCount: number
+  tightenCount: number
+  loosenCount: number
 }
 
 interface OperationResultsProps {
@@ -38,16 +41,28 @@ interface OperationResultsProps {
   isEditing: boolean
   /** PLCのDアドレスから受け取る現在工程ステップ値。フロー図の該当工程を強調表示します。 */
   activeStep?: number
-  /** 稼働実績（検査回数・異常回数・上刃挿入回数・取付実行回数・取出実行回数・検査OK/NG）の日別データ */
+  /** 稼働実績（異常回数・上刃挿入回数・取付実行回数・取出実行回数・検査OK/NG）の日別データ */
   metrics: MetricPoint[]
-  /** 全体サイクルタイム（秒）。PLCのDレジスタ（未定）またはコード側の蓄積値から算出。 */
+  /** 全体サイクルタイム（秒）。PLCのDレジスタ（未定）またはコード側の蓄積値から算出。サイクル履歴（⑤）の集計に使用。 */
   overallCycleTimeSec?: number
+  /** 稼働時間（秒）。PLCのDレジスタ（未定）から取得する稼働継続時間。KPIカードに表示するのみで、
+   *  日別実績の棒グラフには含めない（旧・検査回数カードの位置に表示）。 */
+  operatingTimeSec?: number
+  /** 取付サイクルの現在サイクルタイム（秒）。PLCのDレジスタ（未定）から取得予定。未指定時は overallCycleTimeSec を使用。 */
+  tightenCycleTimeSec?: number
+  /** 取付サイクルのベストサイクルタイム（秒）。コード側の蓄積値から算出予定。 */
+  tightenBestCycleTimeSec?: number
+  /** 取出サイクルの現在サイクルタイム（秒）。PLCのDレジスタ（未定）から取得予定。未指定時は overallCycleTimeSec を使用。 */
+  loosenCycleTimeSec?: number
+  /** 取出サイクルのベストサイクルタイム（秒）。コード側の蓄積値から算出予定。 */
+  loosenBestCycleTimeSec?: number
   /** PLCのNG判定信号（true = NG検出中） */
   ngSignal?: boolean
   /** 刃物画像のURL。後から差替え可能な構造にするため、固定値ではなくpropsで受け取る */
   bladeImageUrl?: string
-  /** 10秒稼働率の推移データ。PLCアドレス未定のため未指定時はサンプル値を使用 */
-  tenSecUtilization?: UtilizationPoint[]
+  /** 異常回数・取付実行回数・取出実行回数の時系列推移データ（横軸＝稼働時間）。
+   *  PLCアドレス未定のため未指定時はサンプル値を使用 */
+  hourlyTrend?: HourlyTrendPoint[]
   onEditingChange: (value: boolean) => void
 }
 
@@ -66,25 +81,38 @@ const BAR_PAD_B = 60
 const BAR_PAD_T = 40
 const CHART_AXIS_FONT_SIZE = 48
 
-// 10秒稼働率グラフ（折れ線）
-const UTIL_CHART_W = 1800
-const UTIL_CHART_H = 260
-const UTIL_PAD_L = 160
-const UTIL_PAD_R = 5
-const UTIL_PAD_T = 55
-const UTIL_PAD_B = 50
+// 時系列推移グラフ（折れ線：異常回数・取付実行回数・取出実行回数）
+const HOURLY_CHART_W = 1800
+const HOURLY_CHART_H = 260
+const HOURLY_PAD_L = 160
+const HOURLY_PAD_R = 5
+const HOURLY_PAD_T = 55
+const HOURLY_PAD_B = 50
+/** Y軸最大値の刻み幅。50→100→150…と、実データの最大値を超えるまで50刻みで切り上げる */
+const HOURLY_Y_STEP = 50
 
 /** グラフエリア（④）の自動切替間隔（ミリ秒） */
-const CAROUSEL_INTERVAL_MS = 8000
+const CAROUSEL_INTERVAL_MS = 180000
 
 /** サイクル履歴（⑤）：最下部ティッカーの最大表示件数 */
 const CYCLE_HISTORY_DISPLAY_MAX = 5
 
-/** KPIカード・棒グラフ共通の5指標定義（色を統一するため同じ定義を両方で使用する） */
+/** KPIカード・棒グラフ共通の4指標定義（色を統一するため同じ定義を両方で使用する）。
+ *  検査回数は稼働時間カードに置き換わったためここには含めない（日別の棒グラフにも表示しない）。 */
 const METRIC_DEFS: { key: MetricKey; label: string; defaultColor: string }[] = [
-  { key: 'inspectCount', label: '検査回数', defaultColor: '#4f9cd9' },
   { key: 'anomalyCount', label: '異常回数', defaultColor: '#e0503f' },
   { key: 'insertCount', label: '上刃挿入回数', defaultColor: '#e0b04f' },
+  { key: 'tightenCount', label: '取付実行回数', defaultColor: '#4fbf8f' },
+  { key: 'loosenCount', label: '取出実行回数', defaultColor: '#8a7fc9' },
+]
+
+/** KPIカードとして表示する指標のキー（上刃挿入回数は稼働時間カード新設に伴いカード表示を廃止。
+ *  ただし棒グラフ・色編集パネルには引き続き含める） */
+const KPI_CARD_KEYS: MetricKey[] = ['anomalyCount', 'tightenCount', 'loosenCount']
+
+/** 時系列推移グラフ（異常回数・取付実行回数・取出実行回数）の3指標定義。色はKPIカードと統一する */
+const HOURLY_DEFS: { key: 'anomalyCount' | 'tightenCount' | 'loosenCount'; label: string; defaultColor: string }[] = [
+  { key: 'anomalyCount', label: '異常回数', defaultColor: '#e0503f' },
   { key: 'tightenCount', label: '取付実行回数', defaultColor: '#4fbf8f' },
   { key: 'loosenCount', label: '取出実行回数', defaultColor: '#8a7fc9' },
 ]
@@ -107,19 +135,31 @@ const STATUS_COLOR: Record<CycleStatus, string> = {
   pending: '#7d8aa8',
 }
 
-/** 10秒稼働率のサンプル値（PLCアドレス確定まではこちらを表示） */
-const SAMPLE_UTILIZATION: UtilizationPoint[] = [
-  { label: '0s', rate: 82 },
-  { label: '10s', rate: 88 },
-  { label: '20s', rate: 91 },
-  { label: '30s', rate: 85 },
-  { label: '40s', rate: 93 },
-  { label: '50s', rate: 90 },
+/** 異常回数・取付実行回数・取出実行回数の推移サンプル値（PLCアドレス確定まではこちらを表示）。
+ *  横軸は10:00スタートの2時間を5ポイントに等分（30分刻み）。 */
+const SAMPLE_HOURLY_TREND: HourlyTrendPoint[] = [
+  { time: '10:00', anomalyCount: 2, tightenCount: 18, loosenCount: 17 },
+  { time: '10:30', anomalyCount: 4, tightenCount: 40, loosenCount: 38 },
+  { time: '11:00', anomalyCount: 6, tightenCount: 65, loosenCount: 63 },
+  { time: '11:30', anomalyCount: 9, tightenCount: 92, loosenCount: 90 },
+  { time: '12:00', anomalyCount: 11, tightenCount: 120, loosenCount: 118 },
 ]
 
-function formatCycleTime(sec?: number) {
-  if (!sec || sec <= 0) return '--'
-  return `${sec.toFixed(1)} 秒`
+/** サイクルタイム表示用：秒 → "HH:MM:SS" */
+function formatHms(sec?: number) {
+  if (sec === undefined || sec === null || sec < 0 || Number.isNaN(sec)) return '--:--:--'
+  const total = Math.floor(sec)
+  const h = Math.floor(total / 3600)
+  const m = Math.floor((total % 3600) / 60)
+  const s = total % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(h)}：${pad(m)}：${pad(s)}`
+}
+
+/** 稼働時間カード表示用：秒 → "□.□h"（時間の小数第1位まで） */
+function formatOperatingHours(sec?: number) {
+  if (sec === undefined || sec === null || sec < 0 || Number.isNaN(sec)) return '--h'
+  return `${(sec / 3600).toFixed(1)}h`
 }
 
 function computeMaxCount(values: number[][]): number {
@@ -128,6 +168,16 @@ function computeMaxCount(values: number[][]): number {
   const padded = max + 5
   return Math.max(Math.round(padded / 10) * 10, 10)
 }
+
+/** 時系列推移グラフのY軸最大値：50スタートで、実データの最大値を超えるまで50刻みで切り上げる
+ *  （50→100→150→200…）。戻り値は必ずHOURLY_Y_STEPの倍数。 */
+function computeHourlyMaxY(values: number[][]): number {
+  const max = Math.max(...values.flat(), 0)
+  return Math.max(Math.ceil(max / HOURLY_Y_STEP) * HOURLY_Y_STEP, HOURLY_Y_STEP)
+}
+
+/** 目盛りポイント数：Y軸最大値の水準に関わらず3ポイント（0・中間・最大）に統一する */
+const HOURLY_GRID_LINES = 2
 
 interface ChartItem {
   id: string
@@ -142,15 +192,20 @@ export default function OperationResults({
   activeStep,
   metrics,
   overallCycleTimeSec,
+  operatingTimeSec,
+  tightenCycleTimeSec,
+  tightenBestCycleTimeSec,
+  loosenCycleTimeSec,
+  loosenBestCycleTimeSec,
   ngSignal,
   bladeImageUrl,
-  tenSecUtilization,
+  hourlyTrend,
   onEditingChange,
 }: OperationResultsProps) {
   const isMobile = useIsMobile()
   const [customColors, setCustomColors] = useState<Record<string, string>>({})
 
-  /** グラフエリア統合（④）：日別実績／10秒稼働率を一定間隔で自動切替する */
+  /** グラフエリア統合（④）：日別実績／稼働時間推移（異常・取付・取出）を一定間隔で自動切替する */
   const [carouselIndex, setCarouselIndex] = useState(0)
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -159,8 +214,8 @@ export default function OperationResults({
     return () => window.clearInterval(timer)
   }, [])
 
-  /** サイクル履歴・ベストサイクルタイム（⑤） */
-  const { history, bestCycleTimeSec } = useCycleHistory(overallCycleTimeSec)
+  /** サイクル履歴（⑤） */
+  const { history } = useCycleHistory(overallCycleTimeSec)
 
   /** 新規追加された行だけにスライドインアニメーションを付ける */
   const [flashNo, setFlashNo] = useState<number | null>(null)
@@ -218,17 +273,31 @@ export default function OperationResults({
     () => okNgItems.map((it) => ({ ...it, total: it.values.reduce((sum, v) => sum + v, 0) })),
     [okNgItems]
   )
-  const grandTotal = Math.max(okNgTotals.reduce((sum, it) => sum + it.total, 0), 1)
+  const inspectTotal = okNgTotals.reduce((sum, it) => sum + it.total, 0)
+  const grandTotal = Math.max(inspectTotal, 1)
 
-  const utilizationData = tenSecUtilization && tenSecUtilization.length > 0 ? tenSecUtilization : SAMPLE_UTILIZATION
-  const utilPlotW = UTIL_CHART_W - UTIL_PAD_L - UTIL_PAD_R
-  const utilPlotH = UTIL_CHART_H - UTIL_PAD_T - UTIL_PAD_B
-  const utilPoints = utilizationData.map((p, i) => {
-    const x = UTIL_PAD_L + (utilPlotW / Math.max(utilizationData.length - 1, 1)) * i
-    const y = UTIL_PAD_T + utilPlotH - (Math.min(Math.max(p.rate, 0), 100) / 100) * utilPlotH
-    return { x, y, ...p }
-  })
-  const utilPolylinePoints = utilPoints.map((p) => `${p.x},${p.y}`).join(' ')
+  const hourlyData = hourlyTrend && hourlyTrend.length > 0 ? hourlyTrend : SAMPLE_HOURLY_TREND
+
+  const hourlyItems: ChartItem[] = useMemo(
+    () =>
+      HOURLY_DEFS.map((def) => ({
+        id: def.key,
+        label: def.label,
+        color: customColors[def.key] ?? def.defaultColor,
+        values: hourlyData.map((p) => p[def.key]),
+      })),
+    [hourlyData, customColors]
+  )
+  const hourlyPlotW = HOURLY_CHART_W - HOURLY_PAD_L - HOURLY_PAD_R
+  const hourlyPlotH = HOURLY_CHART_H - HOURLY_PAD_T - HOURLY_PAD_B
+  const hourlyMaxY = computeHourlyMaxY(hourlyItems.map((it) => it.values))
+  const hourlyGridLines = HOURLY_GRID_LINES
+  const hourlyXAt = (i: number) => HOURLY_PAD_L + (hourlyPlotW / Math.max(hourlyData.length - 1, 1)) * i
+  const hourlyYAt = (v: number) => HOURLY_PAD_T + hourlyPlotH - (Math.min(Math.max(v, 0), hourlyMaxY) / hourlyMaxY) * hourlyPlotH
+  const hourlySeries = hourlyItems.map((it) => ({
+    ...it,
+    points: it.values.map((v, i) => ({ x: hourlyXAt(i), y: hourlyYAt(v) })),
+  }))
 
   const handleColorChange = (id: string, color: string) => {
     setCustomColors((prev) => ({ ...prev, [id]: color }))
@@ -262,58 +331,117 @@ export default function OperationResults({
       cancelAnimationFrame(frame)
       ro.disconnect()
     }
-  }, [metrics, activeStep, ngSignal, isMobile, overallCycleTimeSec, carouselIndex, displayedHistory.length])
+  }, [
+    metrics,
+    activeStep,
+    ngSignal,
+    isMobile,
+    overallCycleTimeSec,
+    operatingTimeSec,
+    tightenCycleTimeSec,
+    tightenBestCycleTimeSec,
+    loosenCycleTimeSec,
+    loosenBestCycleTimeSec,
+    hourlyTrend,
+    carouselIndex,
+    displayedHistory.length,
+  ])
 
-  /** ベスト／現在サイクルタイム：グラフの色分けと混同しないよう、あえて色を付けずKPIカードと同じ形で表示する */
-  const cycleTimeCards = (
-    <>
-      <div className="op-results__kpi-card" style={{ borderLeftColor: theme.border, background: theme.headerBg }}>
-        <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
-          bestサイクルタイム
-        </span>
-        <span className="op-results__kpi-value-wrap">
-          <span className="op-results__kpi-value" style={{ color: theme.text }}>
-            {formatCycleTime(bestCycleTimeSec)}
-          </span>
-        </span>
-      </div>
-      <div className="op-results__kpi-card" style={{ borderLeftColor: theme.border, background: theme.headerBg }}>
-        <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
-          現在サイクルタイム
-        </span>
-        <span className="op-results__kpi-value-wrap">
-          <span className="op-results__kpi-value" style={{ color: theme.text }}>
-            {formatCycleTime(overallCycleTimeSec)}
-          </span>
-        </span>
-      </div>
-    </>
-  )
-
-  /** KPIカード（②）：検査回数・異常回数・上刃挿入回数・取付実行回数・取出実行回数＋ベスト／現在サイクルタイムを縦配置。
-   *  色は棒グラフと統一し、異常回数のみ常時うっすら赤みを付ける。サイクルタイムはグラフの色と混雑しないよう色分けなし。 */
-  const kpiColumn = (
-    <div className="op-results__kpi-col">
-      {kpiItems.map((it) => (
+  /** サイクルタイム（取付／取出）：2枚のカードを横並びにし、各カード内はサイクル対象名／BESTタイム／
+   *  現在タイムを縦に3行で表示する。棒グラフの色分けと混同しないよう色は付けず、BESTタイムのみ強調色・
+   *  やや小さめのフォントで表示する（"BEST"の文字はさらに一段小さく）。
+   *  取付／取出それぞれのサイクルタイムPLCアドレスが未定の間は overallCycleTimeSec をフォールバックとして使用する。 */
+  const cycleTimeSection = (
+     <div className="op-results__cycletime-section">
+      <span
+       className="op-results__cycletime-heading"
+       style={{ color: theme.subtext }}
+      >
+        サイクルタイム
+      </span>
+      <div className="op-results__cycletime-cards">
         <div
-          key={it.id}
-          className={`op-results__kpi-card${it.id === 'anomalyCount' ? ' op-results__kpi-card--anomaly' : ''}`}
-          style={{ borderLeftColor: it.color, background: theme.headerBg }}
+          className="op-results__cycletime-card"
+          style={{
+           border: `1px solid ${theme.border}`,
+           background: theme.headerBg,
+          }}
         >
-          <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
-            {it.label}
+          <span className="op-results__cycletime-name" style={{ color: theme.text }}>
+            取付
           </span>
-          <span className="op-results__kpi-value-wrap">
-            <span className="op-results__kpi-value" style={{ color: theme.text }}>
-              {latest?.[it.id as MetricKey] ?? '--'}
-            </span>
-            <span className="op-results__kpi-unit" style={{ color: theme.subtext }}>
-              回
-            </span>
+          <span className="op-results__cycletime-best" style={{ color: theme.accent }}>
+            <span className="op-results__cycletime-best-label">BEST</span>
+            {formatHms(tightenBestCycleTimeSec)}
+          </span>
+          <span className="op-results__cycletime-current" style={{ color: theme.text }}>
+            {formatHms(tightenCycleTimeSec ?? overallCycleTimeSec)}
           </span>
         </div>
-      ))}
-      {cycleTimeCards}
+         <div
+          className="op-results__cycletime-card"
+          style={{
+           border: `1px solid ${theme.border}`,
+           background: theme.headerBg,
+          }}
+         >
+          <span className="op-results__cycletime-name" style={{ color: theme.text }}>
+            取出
+          </span>
+          <span className="op-results__cycletime-best" style={{ color: theme.accent }}>
+            <span className="op-results__cycletime-best-label">BEST</span>
+            {formatHms(loosenBestCycleTimeSec)}
+          </span>
+          <span className="op-results__cycletime-current" style={{ color: theme.text }}>
+            {formatHms(loosenCycleTimeSec ?? overallCycleTimeSec)}
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+
+  /** 稼働時間カード：旧・検査回数カードの位置に表示。日別実績の棒グラフには含めない。表示形式は「□.□h」。 */
+  const operatingTimeCard = (
+    <div className="op-results__kpi-card" style={{ borderLeftColor: theme.border, background: theme.headerBg }}>
+      <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
+        稼働時間
+      </span>
+      <span className="op-results__kpi-value-wrap">
+        <span className="op-results__kpi-value" style={{ color: theme.text }}>
+          {formatOperatingHours(operatingTimeSec)}
+        </span>
+      </span>
+    </div>
+  )
+
+  /** KPIカード（②）：稼働時間・異常回数・取付実行回数・取出実行回数＋サイクルタイム（取付／取出）を縦配置。
+   *  色は棒グラフと統一し、異常回数のみ常時うっすら赤みを付ける。上刃挿入回数はカード表示を廃止（棒グラフ・
+   *  色編集パネルには残す）。カードが2枚減った分、各カードの高さを広げてよい。 */
+  const kpiColumn = (
+    <div className="op-results__kpi-col">
+      {operatingTimeCard}
+      {kpiItems
+        .filter((it) => KPI_CARD_KEYS.includes(it.id as MetricKey))
+        .map((it) => (
+          <div
+            key={it.id}
+            className={`op-results__kpi-card${it.id === 'anomalyCount' ? ' op-results__kpi-card--anomaly' : ''}`}
+            style={{ borderLeftColor: it.color, background: theme.headerBg }}
+          >
+            <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
+              {it.label}
+            </span>
+            <span className="op-results__kpi-value-wrap">
+              <span className="op-results__kpi-value" style={{ color: theme.text }}>
+                {latest?.[it.id as MetricKey] ?? '--'}
+              </span>
+              <span className="op-results__kpi-unit" style={{ color: theme.subtext }}>
+                回
+              </span>
+            </span>
+          </div>
+        ))}
+      {cycleTimeSection}
     </div>
   )
 
@@ -322,25 +450,28 @@ export default function OperationResults({
    *  （幅が途切れる横スクロールや、読み取りにくいグラフを避けるための簡易表示） */
   const mobileStatsList = (
     <div className="op-results__kpi-col">
-      {kpiItems.map((it) => (
-        <div
-          key={it.id}
-          className={`op-results__kpi-card${it.id === 'anomalyCount' ? ' op-results__kpi-card--anomaly' : ''}`}
-          style={{ borderLeftColor: it.color, background: theme.headerBg }}
-        >
-          <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
-            {it.label}
-          </span>
-          <span className="op-results__kpi-value-wrap">
-            <span className="op-results__kpi-value" style={{ color: theme.text }}>
-              {latest?.[it.id as MetricKey] ?? '--'}
+      {operatingTimeCard}
+      {kpiItems
+        .filter((it) => KPI_CARD_KEYS.includes(it.id as MetricKey))
+        .map((it) => (
+          <div
+            key={it.id}
+            className={`op-results__kpi-card${it.id === 'anomalyCount' ? ' op-results__kpi-card--anomaly' : ''}`}
+            style={{ borderLeftColor: it.color, background: theme.headerBg }}
+          >
+            <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
+              {it.label}
             </span>
-            <span className="op-results__kpi-unit" style={{ color: theme.subtext }}>
-              回
+            <span className="op-results__kpi-value-wrap">
+              <span className="op-results__kpi-value" style={{ color: theme.text }}>
+                {latest?.[it.id as MetricKey] ?? '--'}
+              </span>
+              <span className="op-results__kpi-unit" style={{ color: theme.subtext }}>
+                回
+              </span>
             </span>
-          </span>
-        </div>
-      ))}
+          </div>
+        ))}
       {okNgTotals.map((it) => (
         <div key={it.id} className="op-results__kpi-card" style={{ borderLeftColor: it.color, background: theme.headerBg }}>
           <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
@@ -356,20 +487,20 @@ export default function OperationResults({
           </span>
         </div>
       ))}
-      <div className="op-results__kpi-card" style={{ borderLeftColor: theme.accent, background: theme.headerBg }}>
+      <div className="op-results__kpi-card" style={{ borderLeftColor: theme.border, background: theme.headerBg }}>
         <span className="op-results__kpi-label" style={{ color: theme.subtext }}>
-          稼働率（現在）
+          検査回数
         </span>
         <span className="op-results__kpi-value-wrap">
           <span className="op-results__kpi-value" style={{ color: theme.text }}>
-            {utilizationData.at(-1)?.rate ?? '--'}
+            {inspectTotal}
           </span>
           <span className="op-results__kpi-unit" style={{ color: theme.subtext }}>
-            %
+            回
           </span>
         </span>
       </div>
-      {cycleTimeCards}
+      {cycleTimeSection}
     </div>
   )
 
@@ -432,6 +563,10 @@ export default function OperationResults({
           )
         })}
       </div>
+      {/* 検査回数＝OK回数＋NG回数。専用カード・円グラフ内の区分は設けず、ラベルのみ legend の下に表示する */}
+      <span className="op-results__okng-inspect-total" style={{ color: theme.subtext }}>
+        検査回数：{inspectTotal}回
+      </span>
 
       {!isMobile && (
         <div className="op-results__blade-frame" style={{ borderColor: theme.border }}>
@@ -443,13 +578,13 @@ export default function OperationResults({
     </div>
   )
 
-  /** グラフエリア統合（④）：日別実績（棒グラフ）と10秒稼働率（折れ線）を一定間隔で自動切替。
-   *  傾向把握が目的のため、グラフ下のラベル・棒の上の数値ラベルは表示しない。 */
+  /** グラフエリア統合（④）：日別実績（棒グラフ）と稼働時間推移（異常回数・取付実行回数・取出実行回数の折れ線）を
+   *  一定間隔で自動切替。傾向把握が目的のため、棒の上の数値ラベルは表示しない（折れ線側は凡例のみ表示）。 */
   const graphCarousel = (
     <div className="op-results__graph-carousel">
       <div className="op-results__graph-carousel-head">
         <span className="op-results__graph-carousel-title" style={{ color: theme.text }}>
-          {carouselIndex === 0 ? '日別実績' : '10秒稼働率'}
+          {carouselIndex === 0 ? '日別実績' : '稼働時間推移（異常・取付・取出）'}
         </span>
         <span className="op-results__graph-carousel-dots">
           <span className={`op-results__graph-carousel-dot${carouselIndex === 0 ? ' op-results__graph-carousel-dot--active' : ''}`} style={{ background: theme.accent }} />
@@ -509,36 +644,44 @@ export default function OperationResults({
         ) : (
           <svg
             className="op-results__chart"
-            viewBox={`0 0 ${UTIL_CHART_W} ${UTIL_CHART_H}`}
+            viewBox={`0 0 ${HOURLY_CHART_W} ${HOURLY_CHART_H}`}
             preserveAspectRatio="xMinYMin meet"
             role="img"
-            aria-label="10秒稼働率の推移グラフ"
+            aria-label="稼働時間ごとの異常回数・取付実行回数・取出実行回数の推移グラフ"
             style={{ background: theme.surface }}
           >
-            {[0, 50, 100].map((v) => {
-              const y = UTIL_PAD_T + utilPlotH - (v / 100) * utilPlotH
+            {Array.from({ length: hourlyGridLines + 1 }).map((_, i) => {
+              const value = Math.round((hourlyMaxY / hourlyGridLines) * i)
+              const y = hourlyYAt(value)
               return (
-                <g key={v}>
-                  <line x1={UTIL_PAD_L} x2={UTIL_CHART_W - UTIL_PAD_R} y1={y} y2={y} stroke={theme.border} strokeWidth={1} opacity={0.6} />
-                  <text x={UTIL_PAD_L - 8} y={y + 3} textAnchor="end" fontSize={CHART_AXIS_FONT_SIZE} fill={theme.subtext}>
-                    {v}%
+                <g key={i}>
+                  <line x1={HOURLY_PAD_L} x2={HOURLY_CHART_W - HOURLY_PAD_R} y1={y} y2={y} stroke={theme.border} strokeWidth={1} opacity={0.6} />
+                  <text x={HOURLY_PAD_L - 8} y={y + 3} textAnchor="end" fontSize={CHART_AXIS_FONT_SIZE} fill={theme.subtext}>
+                    {value}
                   </text>
                 </g>
               )
             })}
-            <polyline points={utilPolylinePoints} fill="none" stroke={theme.accent} strokeWidth={3} />
-            {utilPoints.map((p) => (
-              <g key={p.label}>
-                <circle cx={p.x} cy={p.y} r={4} fill={theme.accent} />
-                <text
-                  x={p.x + (p.label === '0s' ? 25 : 0)}
-                  y={UTIL_CHART_H - 8}
-                  textAnchor="middle"
-                  fontSize={CHART_AXIS_FONT_SIZE}
-                  fill={theme.subtext}
-                >
-                  {p.label}
-                </text>
+            {hourlyData.map((p, i) => (
+              <text
+                key={p.time}
+                x={hourlyXAt(i)}
+                y={HOURLY_CHART_H - 8}
+                textAnchor="middle"
+                fontSize={CHART_AXIS_FONT_SIZE}
+                fill={theme.subtext}
+              >
+                {p.time}
+              </text>
+            ))}
+            {hourlySeries.map((s) => (
+              <g key={s.id}>
+                <polyline points={s.points.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={s.color} strokeWidth={3} />
+                {s.points.map((p, i) => (
+                  <circle key={i} cx={p.x} cy={p.y} r={4} fill={s.color}>
+                    <title>{`${hourlyData[i].time} ${s.label}: ${s.values[i]}回`}</title>
+                  </circle>
+                ))}
               </g>
             ))}
           </svg>

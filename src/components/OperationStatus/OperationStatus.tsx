@@ -4,9 +4,10 @@ import PanelFrame from '../common/PanelFrame'
 import type { Theme } from '../../types'
 
 import RobotHeaderBadge from './RobotHeaderBadge'
-import AxisRow, { type AxisRowData } from './AxisRow'
+import AxisRow, { type AxisRowData, type AxisSideData } from './AxisRow'
 import AxisTable from './AxisTable'
 import AverageSpeedGauge from './AverageSpeedGauge'
+import RobotAxisDiagram, { AXIS_NAMES, AXIS_DISPLAY_ORDER, AXIS_ROW_FLEX, type AxisName } from './RobotAxisDiagram'
 import { RB1_COLOR, RB2_COLOR } from './robotColors'
 
 import './OperationStatus.css'
@@ -21,7 +22,7 @@ export interface AxisStat {
 export type RobotKey = 'RB1' | 'RB2'
 
 export interface RobotStat {
-  motors: AxisStat[] // 長さ6を想定（RB1-1〜RB1-6 / RB2-1〜RB2-6）
+  motors: AxisStat[] // 長さ6を想定。根元から順にS,L,U,R,B,Tに対応（motors[0]=S 〜 motors[5]=T）
   /** 稼働率（PLC由来。%）。Dレジスタのアドレスは config/robotStatusAddresses.ts を参照 */
   utilizationRate: number
 }
@@ -49,7 +50,7 @@ export default function OperationStatus({
   isEditing,
   onEditingChange,
 }: OperationStatusProps) {
-  const axisCount = Math.max(robotRB1.motors.length, robotRB2.motors.length, 6)
+  const axisCount = 6 // S,L,U,R,B,Tの6軸固定（安川協働ロボット：6軸垂直多関節）
 
   // RB1/RB2カラーの編集（参考：OperationResults.tsxの色編集パターン）
   const [customColors, setCustomColors] = useState<{ rb1?: string; rb2?: string }>({})
@@ -57,21 +58,11 @@ export default function OperationStatus({
   const rb2Color = customColors.rb2 ?? RB2_COLOR
   const handleResetColors = () => setCustomColors({})
 
-  // 軸1〜6の名称編集（現場の実際の軸名が異なるため、初期名も変更できるようにする）
-  const [customAxisNames, setCustomAxisNames] = useState<string[]>([])
-  const axisNames = Array.from({ length: axisCount }, (_, i) => customAxisNames[i] ?? `軸${i + 1}`)
-  const handleAxisNameChange = (index: number, value: string) => {
-    setCustomAxisNames((prev) => {
-      const next = [...prev]
-      next[index] = value
-      return next
-    })
-  }
-  const handleResetAxisNames = () => setCustomAxisNames([])
-
+  // 軸名称はS/L/U/R/B/T固定（安川協働ロボットの実際の関節位置に対応させるため、
+  // 数字のラベルや編集パネルでの名称変更は廃止した）
   const axisRows: AxisRowData[] = Array.from({ length: axisCount }, (_, i) => ({
     axis: i + 1,
-    axisLabel: axisNames[i],
+    axisLabel: AXIS_NAMES[i],
     rb1: {
       torqueValue: robotRB1.motors[i]?.torque ?? 0,
       torquePeak: robotRB1.motors[i]?.peakTorque ?? 0,
@@ -83,6 +74,13 @@ export default function OperationStatus({
       speed: robotRB2.motors[i]?.speed ?? 0,
     },
   }))
+
+  // 表示順は根元(S)を下・先端(T)を上に反転する（ロボット模式図が床に立っている
+  // 見た目と揃えるため。データそのもの（axisRows・warningAxesの並び）は
+  // 軸番号(axis-1)基準のままで変更しない） → 描画するときだけこの並びを使う
+  const displayRows: AxisRowData[] = AXIS_DISPLAY_ORDER.map(
+    (name) => axisRows[AXIS_NAMES.indexOf(name)],
+  )
 
   const [warningAxes, setWarningAxes] = useState<boolean[]>(() => Array(axisCount).fill(false))
   const releaseTimersRef = useRef<Array<number | undefined>>([])
@@ -154,15 +152,27 @@ export default function OperationStatus({
     setSelectedMobileRB((prev) => (prev === rb ? null : rb))
   }
 
+  const toSideData = (row: AxisRowData, side: 'rb1' | 'rb2'): AxisSideData => ({
+    axis: row.axis,
+    torqueValue: row[side].torqueValue,
+    torquePeak: row[side].torquePeak,
+    speed: row[side].speed,
+  })
+
   return (
     <PanelFrame className={`op-status op-status--${theme}`}>
       <div className="axis-monitor">
         <div className="axis-monitor__body">
           <div className="axis-monitor__main-col">
             {/* RB1/RB2ラベルは枠付きの箱(boxed)に変更し、縦に間延びさせず
-               同じ行の隣に平均速度ゲージを並べる（旧・speed-gauge-rowはここに統合）。
-               中央列にはトルクバー群の見出しとなる「トルク」バッジを配置する。 */}
-            <div className="axis-monitor__header-row">
+               同じ行の隣に平均速度ゲージを並べる。中央にはロボット模式図の
+               見出しとなる「トルク」バッジを配置する。
+               このヘッダー行・下の速度キャプション行・軸データ行はすべて
+               axis-monitor__grid（RB1列／模式図列／RB2列の3列グリッド）の
+               直接の子要素として並べており、模式図と各データ行の高さが
+               常に揃うようにしている。 */}
+            <div className="axis-monitor__grid">
+              {/* --- 1行目：RB1バッジ・トルク見出し・RB2バッジ --- */}
               <div className="axis-monitor__header-rb1">
                 <RobotHeaderBadge
                   label="RB1"
@@ -185,6 +195,15 @@ export default function OperationStatus({
                 />
               </div>
 
+              <div className="axis-monitor__header-center">
+                <div
+                  className="axis-monitor__torque-badge"
+                  style={{ color: theme.text }}
+                >
+                  トルク (N·m)
+                </div>
+              </div>
+
               <div className="axis-monitor__header-rb2">
                 <AverageSpeedGauge value={rb2AvgTorque} color={rb2Color} label="平均トルク" />
                 <RobotHeaderBadge
@@ -200,40 +219,49 @@ export default function OperationStatus({
                   dimmed={selectedMobileRB === 'RB1'}
                 />
               </div>
-            </div>
 
-            {/* 「速度」の文字は各軸行で繰り返さず、ここで1か所だけ表示する
-               （RB1側＝1列目／RB2側＝5列目。軸ごとのSpeedBarはアイコンのみ） */}
-            <div className="axis-monitor__speed-caption-row">
-              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb1" style={{ color: theme.text }}>
+              {/* --- 2行目：「速度」キャプション（RB1側／RB2側に1か所ずつだけ表示） --- */}
+              <span className="axis-monitor__speed-caption" style={{ color: theme.text }}>
                 速度 (deg/s)
               </span>
-              <div className="axis-monitor__header-center">
-                <div
-                  className="axis-monitor__torque-badge"
-                  style={{ borderColor: `${theme.text}55`, color: theme.text }}
-                >
-                  トルク (N·m)
-                </div>
+              <div className="axis-monitor__row2-spacer" aria-hidden="true" />
+              <span className="axis-monitor__speed-caption" style={{ color: theme.text }}>
+                速度 (deg/s)
+              </span>
+
+              {/* --- 3行目：RB1軸データ行 / ロボット模式図 / RB2軸データ行 ---
+                 表示順は先端(T)が上・根元(S)が下（模式図が床に立っている見た目と揃える）。
+                 各行のflexGrowはAXIS_ROW_FLEX（模式図の関節間隔）と共有しており、
+                 どの行がどの関節に対応するかが模式図を見ただけで分かるようにしている。 */}
+              <div className="axis-monitor__rows axis-monitor__rows--rb1">
+                {displayRows.map((row) => (
+                  <AxisRow
+                    key={row.axis}
+                    side="rb1"
+                    data={toSideData(row, 'rb1')}
+                    threshold={THRESHOLD}
+                    isWarning={warningAxes[row.axis - 1] ?? false}
+                    color={rb1Color}
+                    flexGrow={AXIS_ROW_FLEX[row.axisLabel as AxisName]}
+                  />
+                ))}
               </div>
-              <span className="axis-monitor__speed-caption axis-monitor__speed-caption--rb2" style={{ color: theme.text }}>
-                速度 (deg/s)
-              </span>
-            </div>
 
-            {/* 軸1〜6：モニタ表示（グリッド＋ゲージ）。モバイル幅ではCSSで非表示にする */}
-            <div className="axis-monitor__rows">
-              {axisRows.map((row) => (
-                <AxisRow
-                  key={row.axis}
-                  data={row}
-                  threshold={THRESHOLD}
-                  isWarning={warningAxes[row.axis - 1] ?? false}
-                  rb1Color={rb1Color}
-                  rb2Color={rb2Color}
-                  theme={theme}
-                />
-              ))}
+              <RobotAxisDiagram theme={theme} warningAxes={warningAxes} />
+
+              <div className="axis-monitor__rows axis-monitor__rows--rb2">
+                {displayRows.map((row) => (
+                  <AxisRow
+                    key={row.axis}
+                    side="rb2"
+                    data={toSideData(row, 'rb2')}
+                    threshold={THRESHOLD}
+                    isWarning={warningAxes[row.axis - 1] ?? false}
+                    color={rb2Color}
+                    flexGrow={AXIS_ROW_FLEX[row.axisLabel as AxisName]}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* モバイル表示：平均トルクカード、RB切替、軸別データ表 */}
@@ -256,7 +284,7 @@ export default function OperationStatus({
             </div>
 
             <AxisTable
-              rows={axisRows}
+              rows={displayRows}
               threshold={THRESHOLD}
               rb1Color={rb1Color}
               rb2Color={rb2Color}
@@ -267,7 +295,7 @@ export default function OperationStatus({
 
           </div>
 
-          {/* 編集パネル：RB1/RB2カラーと軸名を変更可能（モニタ・モバイル共通） */}
+          {/* 編集パネル：RB1/RB2カラーのみ変更可能（軸名称はS/L/U/R/B/T固定のため編集項目を廃止） */}
           {isEditing && (
             <div
               className="axis-monitor__edit-panel"
@@ -323,34 +351,6 @@ export default function OperationStatus({
                       onClick={handleResetColors}
                     >
                       色をリセット
-                    </button>
-                  </div>
-                </section>
-
-                <section className="axis-monitor__panel-section">
-                  <h3 style={{ color: theme.text }}>軸の名称</h3>
-                  <p className="axis-monitor__hint" style={{ color: theme.subtext }}>
-                    現場の実際の軸名に合わせて変更できます。
-                  </p>
-                  <div className="axis-monitor__edit-group">
-                    {axisNames.map((name, i) => (
-                      <label key={i} className="axis-monitor__color-row">
-                        <span style={{ color: theme.subtext }}>軸{i + 1}</span>
-                        <input
-                          type="text"
-                          value={name}
-                          onChange={(e) => handleAxisNameChange(i, e.target.value)}
-                          style={{ borderColor: theme.border, color: theme.text }}
-                        />
-                      </label>
-                    ))}
-                    <button
-                      type="button"
-                      className="axis-monitor__panel-reset"
-                      style={{ borderColor: theme.border, color: theme.subtext }}
-                      onClick={handleResetAxisNames}
-                    >
-                      名称をリセット
                     </button>
                   </div>
                 </section>

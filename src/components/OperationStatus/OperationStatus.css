@@ -33,20 +33,115 @@
   gap: 6px;
 }
 
-/* 軸ラベル列の幅・速度ゲージ列の幅を、ヘッダー行・データ行の両方で揃えるための共通グリッド
-  ※端の列を220pxに広げ、速度ゲージ・稼働率ドーナツの視認性を確保する */
-.axis-monitor__header-row {
+/* ===== 全体レイアウト：RB1列／ロボット模式図列／RB2列の3カラムグリッド =====
+   STATUS画面仕様変更対応：中央に安川協働ロボットの模式図（RobotAxisDiagram）を配置し、
+   模式図の関節位置とRB1/RB2の軸データ行の高さ配分（flexGrow）を揃えるため、
+   3列とも同じ行トラック（header/caption/rows）を共有する1つのCSS Gridにまとめた。
+   これにより「模式図のどの関節が、どのデータ行に対応するか」がズレなく一致する。
+   中央列(260px)は軸名称(S/L/U/R/B/T)固定表示のため、可変幅にする必要はない。 */
+.axis-monitor__grid {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 220px minmax(0, 1fr) 220px;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) 260px minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   column-gap: 14px;
+  row-gap: 6px;
+  flex: 1;
+  min-height: 0;
 }
 
+/* 軸データ行（RB1側／RB2側）：中央寄りに必ずTorqueBarが来るよう、
+   RB1は[速度220px][トルク1fr]、RB2はその左右反転で構成する */
 .axis-row {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 220px minmax(0, 1fr) 220px;
-  align-items: stretch; /* center -> stretch: 行の高さぴったりに子要素を伸ばし、はみ出しを防ぐ */
+  align-items: stretch; /* 行の高さぴったりに子要素を伸ばし、はみ出しを防ぐ */
   column-gap: 14px;
+  min-height: 0;
+}
+
+.axis-row--rb1 {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+.axis-row--rb2 {
+  grid-template-columns: minmax(0, 1fr) 220px;
+}
+
+/* ===== 中央：安川協働ロボット模式図（RobotAxisDiagram） =====
+   axis-monitor__gridの中央列（260px）に配置。3行目セル（rows）は
+   RB1/RB2の軸データ行と同じ高さのトラックを共有しているため、
+   内部の6関節セル(.robot-diagram__cell)にAXIS_ROW_FLEXと同じflexGrowを
+   与えるだけで、模式図の関節位置とデータ行の高さがそのまま一致する。 */
+.robot-diagram {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.robot-diagram__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.robot-diagram__cells {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.robot-diagram__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 0;
+}
+
+.robot-diagram__joint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.08) 32%, transparent 55%),
+    radial-gradient(circle at 65% 75%, rgba(0, 0, 0, 0.35) 0%, transparent 60%),
+    rgba(24, 30, 38, 0.92);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.25),   /* 上側のハイライト */
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55),        /* 下側の陰 */
+    0 3px 6px rgba(0, 0, 0, 0.45);               /* 外側の落ち影 */
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.robot-diagram__joint--warning {
+  color: #ff4d4f !important;
+  border-color: rgba(255, 77, 79, 0.6);
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.25),
+    inset 0 -3px 4px rgba(0, 0, 0, 0.55),
+    0 0 10px rgba(255, 77, 79, 0.55),
+    0 3px 6px rgba(0, 0, 0, 0.45);
+  animation: axis-row-warning-flicker 1s ease-in-out infinite;
+}
+
+.robot-diagram__joint-role {
+  font-size: 20px;
+  white-space: nowrap;
 }
 
 /* ===== 上部タイトルバー ===== */
@@ -150,31 +245,24 @@
   white-space: nowrap;
 }
 
-/* ===== RB1/RB2バッジ＋中央見出し ===== */
+/* ===== RB1/RB2バッジ＋中央見出し =====
+   axis-monitor__grid（3列グリッド）の1行目にそのまま並ぶ直接の子要素になったため、
+   個別のgrid-column指定は不要（1〜3列目に自動配置される）。 */
 
-.axis-monitor__header-row {
-  flex: 0 0 auto;
-}
-
-/* RB1/RB2バッジを、それぞれの速度ゲージ列（軸行の左端／右端＝220px列）の
-   真上に明示的に位置合わせする。中央見出しも軸ラベル列（150px）に揃える。
-   ※これが無いと3つの子要素が1,2,3列目に自動配置され、RB2バッジが
-   実際のRB2速度ゲージ位置とずれてしまう（要望「RB2稼働率をRB2速度側へ」の原因）。 */
-/* RB1側：[RB1ラベル箱][平均速度ゲージ]を横並びにするため、速度ゲージ列＋トルク列
-   （1〜2列目）を1つのflexコンテナとしてspanする。RB2側はその左右反転（4〜5列目）。 */
 .axis-monitor__header-rb1 {
-  grid-column: 1 / 3;
   display: flex;
   align-items: center;
   gap: 14px;
 }
 
 .axis-monitor__header-center {
-  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .axis-monitor__header-rb2 {
-  grid-column: 4 / 6;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -269,22 +357,14 @@
   white-space: nowrap;
 }
 
-.axis-monitor__header-center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
 /* 中央「トルク」見出しバッジ：RB1/RB2ラベル箱・平均速度ゲージと高さを揃えつつ、
-   トルクバー群（軸1〜6の中央列）の見出しとして機能する */
+   トルクバー群（中央のロボット模式図列）の見出しとして機能する */
 .axis-monitor__torque-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 10px 22px;
-  border: 2px solid;
+  border: 2px solid color-mix(in srgb, currentColor 33%, transparent);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   font-size: 25px;
@@ -352,8 +432,8 @@
    6軸平均速度ゲージ（各トルクグラフ群の直上・モニタ版専用）
    透明ガラス調・近未来感のある横長ゲージ。数値ラベルは表示せず、
    バーの充填度合いのみで速度の度合いを見せる。
-   axis-monitor__header-row / axis-row と同じ5列グリッドを再利用し、
-   RB1トルク列（2列目）・RB2トルク列（4列目）に位置を揃える
+   axis-monitor__header-rb1 / axis-monitor__header-rb2内に配置し、
+   RB1・RB2それぞれのラベル箱の隣に位置を揃える
    ===================================================================== */
 
 .speed-gauge {
@@ -439,7 +519,7 @@
    RB1/RB2ラベル箱のみ残す（タブレット用ブレークポイント900pxに合わせる。
    実際の非表示ルールは下部「狭幅対応」内の.axis-monitor__header-rb1/rb2 .speed-gaugeを参照） */
 
-/* ===== 軸1〜6の行 ===== */
+/* ===== S/L/U/R/B/T 軸データ行（RB1側・RB2側で各6行） ===== */
 
 .axis-monitor__rows {
   display: flex;
@@ -450,7 +530,8 @@
 }
 
 .axis-row {
-  flex: 1;
+  /* 高さ配分（flexGrow）はOperationStatus.tsx側でロボット模式図の関節間隔
+     （AXIS_ROW_FLEX）に合わせてインラインで指定するため、ここでは固定しない */
   min-height: 0;
 }
 
@@ -459,66 +540,9 @@
   animation: axis-row-warning-flicker 1s ease-in-out infinite;
 }
 
-.axis-row--warning .axis-row__label {
-  color: #ff4d4f !important;
-}
-
 @keyframes axis-row-warning-flicker {
   0%, 100% { background: transparent; }
   50% { background: rgba(255, 77, 79, 0.14); }
-}
-
-.axis-row__center {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.axis-row__warn-slots {
-  display: flex;
-  gap: 6px;
-  min-height: 15px;
-}
-
-.axis-row__warn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: rgba(255, 77, 79, 0.16);
-  color: #ff4d4f;
-  font-size: 20px;
-  font-weight: 800;
-}
-
-.axis-row__label {
-  font-size: 25px;
-  font-weight: 700;
-  color: var(--text-primary);
-  white-space: nowrap;
-}
-
-/* 軸中央のアイコンボックス：public/{軸名}.png（例：Z.png, X.png）を表示するための枠。
-   画像が存在しない軸名の場合はAxisRow.tsx側でimgをdisplay:noneにし、文字ラベルのみ残す */
-.axis-row__icon-box {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 18px;
-  border: 2px solid;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.axis-row__icon-img {
-  width: 34px;
-  height: 34px;
-  object-fit: contain;
-  flex: 0 0 auto;
 }
 
 /* ===== トルクバー（ピラミッド型・片側分） ===== */
@@ -625,6 +649,10 @@
   height: 100%;
   min-height: 0;
   box-sizing: border-box;
+  /* TorqueBar側がピークラベル分だけ上部を28pxあけているのに合わせ、
+     こちらも同じ分だけあけてから中央寄せする（トルクゲージ・速度ゲージの
+     縦方向の中心を一致させるため） */
+  padding-top: 28px;
 }
 
 .speed-bar__gauge {
@@ -687,14 +715,10 @@
   filter: brightness(1.12) saturate(1.08);
 }
 
-/* ===== 「速度」キャプション（1か所だけ表示） ===== */
-
-.axis-monitor__speed-caption-row {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 220px minmax(0, 1fr) 220px;
-  column-gap: 14px;
-  flex: 0 0 auto;
-}
+/* ===== 「速度」キャプション（1か所だけ表示） =====
+   axis-monitor__grid（3列グリッド）の2行目にそのまま並ぶ直接の子要素
+   （RB1キャプション／中央スペーサー／RB2キャプション）になったため、
+   個別のgrid-column指定は不要（1〜3列目に自動配置される）。 */
 
 .axis-monitor__speed-caption {
   display: inline-flex;
@@ -710,14 +734,6 @@
   text-align: center;
   letter-spacing: 0.05em;
   color: var(--text-secondary, #9aa4b2);
-}
-
-.axis-monitor__speed-caption--rb1 {
-  grid-column: 1;
-}
-
-.axis-monitor__speed-caption--rb2 {
-  grid-column: 5;
 }
 
 /* ===== 速度リング（旧仕様・未使用だが互換のため残置） ===== */
@@ -1035,17 +1051,20 @@
 /* ===== 狭幅対応（タブレット等） ===== */
 
 @media (max-width: 900px) {
-  .axis-monitor__header-row {
-    grid-template-columns: minmax(72px, 0.8fr) minmax(0, 1fr) minmax(72px, 0.8fr);
+  /* 中央列（トルク見出し／速度キャプションのスペーサー／ロボット模式図）を非表示にし、
+     RB1・RB2の2列だけの構成に折りたたむ。display:noneにした要素はグリッドの
+     自動配置から外れるため、残る2つの子要素がそのまま1・2列目に詰まる */
+  .axis-monitor__grid {
+    grid-template-columns: minmax(72px, 1fr) minmax(72px, 1fr);
     column-gap: 6px;
   }
 
-  .axis-monitor__header-rb1 { grid-column: 1; justify-content: flex-start; }
-  .axis-monitor__header-center { grid-column: 2; }
-  .axis-monitor__header-rb2 { grid-column: 3; justify-content: flex-end; }
+  .axis-monitor__header-rb1 { justify-content: flex-start; }
+  .axis-monitor__header-rb2 { justify-content: flex-end; }
 
   .axis-monitor__header-center,
-  .axis-monitor__speed-caption-row {
+  .axis-monitor__row2-spacer,
+  .robot-diagram {
     display: none;
   }
 
@@ -1098,7 +1117,15 @@
 
 /* ===== モバイル対応：グラフ／ゲージ→表に切替、縦スクロール許可 ===== */
 
+@media (max-width: 768px) {
+  .axis-monitor__speed-caption {
+    display: none;
+  }
+
+}
+
 @media (max-width: 640px) {
+
   .axis-monitor {
     height: auto;
     min-height: 0;
@@ -1112,10 +1139,6 @@
   }
 
   .axis-monitor__rows {
-    display: none;
-  }
-
-  .axis-monitor__speed-caption-row {
     display: none;
   }
 

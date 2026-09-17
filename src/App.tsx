@@ -25,24 +25,8 @@ const SHARED_ROBOT_IMAGE_URL = '/NS-Q3.png'
 
 // 速度はPLC対象外のためサンプル値のまま。トルク・ピーク値・稼働率はPLC(Dレジスタ、未定)から取得予定で、
 // アドレス確定までのフォールバックとしてここに仮の値を置いている（config/robotStatusAddresses.ts 参照）
-const SAMPLE_RB1_MOTORS = [
-  { speed: 78, torque: 53, peakTorque: 61 },
-  { speed: 75, torque: 50, peakTorque: 58 },
-  { speed: 80, torque: 55, peakTorque: 64 },
-  { speed: 72, torque: 48, peakTorque: 56 },
-  { speed: 77, torque: 52, peakTorque: 60 },
-  { speed: 79, torque: 54, peakTorque: 62 },
-]
-const SAMPLE_RB1_UTILIZATION = 92
 
-const SAMPLE_RB2_MOTORS = [
-  { speed: 82, torque: 55, peakTorque: 63 },
-  { speed: 79, torque: 51, peakTorque: 59 },
-  { speed: 84, torque: 57, peakTorque: 66 },
-  { speed: 76, torque: 49, peakTorque: 57 },
-  { speed: 81, torque: 53, peakTorque: 61 },
-  { speed: 83, torque: 56, peakTorque: 64 },
-]
+const SAMPLE_RB1_UTILIZATION = 92
 const SAMPLE_RB2_UTILIZATION = 88
 
 // サイクルタイムはジョブ別・ロボット別ではなく、A・B合算の1つの値として扱う
@@ -189,9 +173,9 @@ export default function App() {
 
   const recentDates = getRecentDates(METRIC_DAYS)
   const DATES = recentDates.map((d) => d.label)  //['MM/DD', 'MM/DD', 'MM/DD']
-  // 稼働実績5指標＋検査OK/NGのサンプルデータ（ダミー値）
+  // 稼働実績4指標＋検査OK/NGのサンプルデータ（ダミー値）。
+  // 検査回数はOK回数＋NG回数から算出する表示に変更したため、MetricPointからは除外した。
   const SAMPLE_METRICS: Record<Exclude<keyof MetricPoint, 'date'>, number[]> = {
-   inspectCount:  [ 150, 150, 150],
    anomalyCount:  [ 12, 6, 4],
    insertCount:   [ 96, 145, 118],
    tightenCount:  [ 150, 150, 150],
@@ -202,7 +186,6 @@ export default function App() {
 
   const sampleMetrics: MetricPoint[] = DATES.map((date, i) => ({
    date,
-   inspectCount: SAMPLE_METRICS.inspectCount[i] ?? 0,
    anomalyCount: SAMPLE_METRICS.anomalyCount[i] ?? 0,
    insertCount: SAMPLE_METRICS.insertCount[i] ?? 0,
    tightenCount: SAMPLE_METRICS.tightenCount[i] ?? 0,
@@ -228,12 +211,14 @@ export default function App() {
 
   // RB1・RB2のトルク値・ピーク値・稼働率（PLC Dレジスタは未定のため現状は常に0が返る想定。
   // 確定するまではサンプル値をフォールバックとして使用する）
-  const { rb1AxisTorques, rb2AxisTorques } = usePlcRobotStatusSignals(plcData)
+  const { rb1AxisStats, rb2AxisStats } = usePlcRobotStatusSignals(plcData)
   // 稼働実績5指標・NG判定信号・サイクルタイム（PLC Dレジスタは未定のため現状は常に0が返る想定。
   // 確定するまではサンプル値をフォールバックとして使用する。サイクルタイムはPLC値が
   // 無い場合、サイクル変更タイミング用bitの立上り間隔からコード側で算出した値を使用する）
+  // inspectCountはPLC側の検査回数信号（アドレスはoperationMetricsAddresses.ts参照）。
+  // 表示上の検査回数はOK回数＋NG回数から算出するようになったためMetricPointへは反映しないが、
+  // 信号自体は将来的な用途に備えてそのまま受け取っておく。
   const {
-    inspectCount,
     anomalyCount,
     insertCount,
     tightenCount,
@@ -247,7 +232,6 @@ export default function App() {
     if (i !== sampleMetrics.length - 1) return m
     return {
       ...m,
-      inspectCount: inspectCount || m.inspectCount,
       anomalyCount: anomalyCount || m.anomalyCount,
       insertCount: insertCount || m.insertCount,
       tightenCount: tightenCount || m.tightenCount,
@@ -255,21 +239,20 @@ export default function App() {
     }
   })
 
+  // 稼働時間・取付/取出それぞれのサイクルタイム（ベスト／現在）・稼働時間ごとの
+  // 異常回数/取付実行回数/取出実行回数の推移は、対応するPLCのDレジスタが未定のため
+  // 現時点では未接続（OperationResults側でoverallCycleTimeSecへのフォールバックや
+  // サンプル値表示が行われる）。アドレス確定後、config/operationMetricsAddresses.ts に
+  // 追加のうえここで配線すること。
+
 const robotRB1 = {
-  motors: SAMPLE_RB1_MOTORS.map((m, i) => ({
-    speed: m.speed,
-    torque: rb1AxisTorques[i]?.torque || m.torque,
-    peakTorque: rb1AxisTorques[i]?.peakTorque || m.peakTorque,
-  })),
+  motors: rb1AxisStats,
   utilizationRate: SAMPLE_RB1_UTILIZATION,
 }
 
+
 const robotRB2 = {
-  motors: SAMPLE_RB2_MOTORS.map((m, i) => ({
-    speed: m.speed,
-    torque: rb2AxisTorques[i]?.torque || m.torque,
-    peakTorque: rb2AxisTorques[i]?.peakTorque || m.peakTorque,
-  })),
+  motors: rb2AxisStats,
   utilizationRate: SAMPLE_RB2_UTILIZATION,
 }
 
@@ -343,11 +326,11 @@ const robotRB2 = {
           <img src={theme.logo} alt="logo" className="logo" />
        </div>
 
-        <span className="app-header__title" style={{ color: theme.subtext,fontSize: '19px', }}>
-         {isMobile && currentPage === 'control'
-           ? 'ROBOT PERM'
-           : PAGES.find((p) => p.key === currentPage)?.label}
-        </span>
+        {!isMobile && (
+          <span className="app-header__title" style={{ color: theme.subtext,fontSize: '19px', }}>
+           {PAGES.find((p) => p.key === currentPage)?.label}
+          </span>
+        )}
 
        
 
@@ -509,35 +492,34 @@ const robotRB2 = {
          />
         </div>
       </div>
-      <footer
-        className="app-footer"
-        style={{
-          position: 'fixed',      
-          bottom: 0,               
-          left: 0,                 
-          width: '100%',
-          padding: '3px 0px',
-          borderTop: `1px solid ${theme.border}`,
-          backgroundColor: theme.surface,
-          display: 'flex',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          zIndex: 100,              
-         }}
-        >
-      <span
-        
-        style={{
-          color: theme.text,
-          fontSize: '20px',
-          letterSpacing: '0.5px',
-        }}
-      >
-        e
-        <span style={{ color: theme.accent }}>X</span>
-        ight
-      </span>
-    </footer>
+ <footer
+   className="app-footer"
+   style={{
+    position: 'fixed',
+    bottom: 0,
+    left: 0,
+    width: '100%',
+    padding: '3px 0px',
+    borderTop: `1px solid ${theme.border}`,
+    backgroundColor: theme.surface,
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    zIndex: 100,
+   }}
+   >
+   <span
+    style={{
+      color: theme.text,
+      fontSize: '20px',
+      letterSpacing: '0.5px',
+    }}
+   >
+    e
+    <span style={{ color: theme.accent }}>X</span>
+    <span style={{ marginRight: '10px' }}>ight</span>
+   </span>
+  </footer>
     </div>
   )
   

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 
 const GO2RTC_BASE = 'http://localhost:1984'
+// 接続が切れた際、何ミリ秒後に再接続を試みるか（展示環境で無人稼働させるため必須）
+const RECONNECT_DELAY_MS = 3000
 
 function waitForIceGatheringComplete(pc: RTCPeerConnection) {
   if (pc.iceGatheringState === 'complete') return Promise.resolve()
@@ -20,6 +22,7 @@ export function useGo2rtcStream(streamName: string | undefined) {
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [error, setError] = useState<string | null>(null)
   const pcRef = useRef<RTCPeerConnection | null>(null)
+  const retryTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     if (!streamName) {
@@ -28,7 +31,25 @@ export function useGo2rtcStream(streamName: string | undefined) {
     }
     let cancelled = false
 
+    const clearRetryTimer = () => {
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current)
+        retryTimerRef.current = null
+      }
+    }
+
+    const scheduleReconnect = () => {
+      if (cancelled) return
+      clearRetryTimer()
+      retryTimerRef.current = window.setTimeout(() => {
+        if (!cancelled) connect()
+      }, RECONNECT_DELAY_MS)
+    }
+
     const connect = async () => {
+      // 前の接続が残っていれば片付ける
+      pcRef.current?.close()
+
       const pc = new RTCPeerConnection()
       pcRef.current = pc
 
@@ -37,11 +58,15 @@ export function useGo2rtcStream(streamName: string | undefined) {
       pc.ontrack = (ev) => {
         if (cancelled) return
         setStream(ev.streams[0] ?? new MediaStream([ev.track]))
+        setError(null)
       }
 
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-          if (!cancelled) setError('接続が切断されました')
+          if (cancelled) return
+          setError('接続が切断されました。再接続しています…')
+          setStream(null)
+          scheduleReconnect()
         }
       }
 
@@ -56,7 +81,10 @@ export function useGo2rtcStream(streamName: string | undefined) {
           body: pc.localDescription?.sdp,
         })
         if (!res.ok) {
-          if (!cancelled) setError(`go2rtc接続失敗 (${res.status})`)
+          if (!cancelled) {
+            setError(`go2rtc接続失敗 (${res.status})`)
+            scheduleReconnect()
+          }
           return
         }
         const answerSdp = await res.text()
@@ -64,7 +92,10 @@ export function useGo2rtcStream(streamName: string | undefined) {
         await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp })
         setError(null)
       } catch {
-        if (!cancelled) setError('WebRTC接続エラー')
+        if (!cancelled) {
+          setError('WebRTC接続エラー。再接続しています…')
+          scheduleReconnect()
+        }
       }
     }
 
@@ -72,6 +103,7 @@ export function useGo2rtcStream(streamName: string | undefined) {
 
     return () => {
       cancelled = true
+      clearRetryTimer()
       pcRef.current?.close()
       pcRef.current = null
       setStream(null)

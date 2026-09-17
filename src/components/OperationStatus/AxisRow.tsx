@@ -1,95 +1,94 @@
 // AxisRow.tsx
 //
-// 軸モニタ1行分。[RB1速度ゲージ] [RB1トルクバー] [軸ラベル＋警告] [RB2トルクバー] [RB2速度ゲージ]
-// を1行にまとめ、中央の軸ラベルを軸にRB1/RB2を左右対称（ピラミッド型）に表示する。
+// STATUS画面仕様変更対応：中央に共有のロボット模式図（RobotAxisDiagram）を
+// 配置する構成に変更したため、本コンポーネントは「RB1側だけ」または
+// 「RB2側だけ」の軸データ（速度＋トルク）1行分を描画する役割に変更した
+// （旧版は左右2ロボット分＋中央の軸ラベルボックスを1行にまとめて描画していた。
+//  軸名称の編集機能も、軸名がS/L/U/R/B/T固定になったことに伴い廃止した）。
 //
-// 変更点：
-// ・速度表示はSpeedRing（円形）からSpeedBar（横長）に変更し、縦方向の圧迫を軽減
-// ・RB1/RB2の色は編集パネルで変更できるよう、固定importではなくprops経由で受け取れるようにした
-//   （props省略時はrobotColors.tsのデフォルト色にフォールバック）
-// ・軸名（軸1〜6）を編集できるよう、data.axisLabelがあればそちらを優先表示する
-// ・文字色がthemeによって薄く見えない問題への対応として、theme.text/theme.subtextを
-//   ラベル・警告表示に適用できるようにした
+// side='rb1' … [SpeedBar][TorqueBar]（模式図側＝右寄りにTorqueBarを配置）
+// side='rb2' … [TorqueBar][SpeedBar]（模式図側＝左寄りにTorqueBarを配置）
+// のように、中央（模式図）に近い側に必ずTorqueBarが来るようにし、
+// 模式図を挟んで左右対称（ピラミッド型）に読めるようにしている。
+//
+// 行の高さは軸ごとに均等ではなく、RobotAxisDiagramと共有するAXIS_ROW_FLEX比率
+// （関節間隔のイメージ）に合わせたflexGrowを呼び出し側（OperationStatus.tsx）
+// から受け取る。これにより模式図の関節位置とデータ行の高さが常に一致する。
 
 import TorqueBar from './TorqueBar'
 import SpeedBar from './SpeedBar'
 import { RB1_COLOR, RB2_COLOR, WARN_COLOR } from './robotColors'
-import type { Theme } from '../../types'
 
+/** 軸データ1行分（RB1・RB2両方）。AxisTable.tsx（モバイル表）側は
+ * 引き続きこの結合済みの形を使うため、型はそのまま維持している。 */
 export interface AxisRowData {
   axis: number
-  /** 軸の表示名。未指定時は「軸{axis}」を使用（編集パネルでの名称変更に対応） */
+  /** 軸の表示名。S/L/U/R/B/T固定（OperationStatus.tsx側でAXIS_NAMESから設定） */
   axisLabel?: string
   rb1: { torqueValue: number; torquePeak: number; speed: number }
   rb2: { torqueValue: number; torquePeak: number; speed: number }
 }
 
-interface Props {
-  data: AxisRowData
-  threshold: number
-  /** 編集パネルで変更されたRB1色。省略時はRB1_COLOR */
-  rb1Color?: string
-  /** 編集パネルで変更されたRB2色。省略時はRB2_COLOR */
-  rb2Color?: string
-  /** 文字色をtheme色に揃えるために使用 */
-  theme?: Theme
-  /** 80%でON、70%以下を3秒維持してOFFする軸警告状態 */
-  isWarning?: boolean
+/** 片側（RB1 or RB2）1軸分のデータ */
+export interface AxisSideData {
+  axis: number
+  torqueValue: number
+  torquePeak: number
+  speed: number
 }
 
-export default function AxisRow({
-  data,
-  threshold,
-  rb1Color = RB1_COLOR,
-  rb2Color = RB2_COLOR,
-  theme,
-  isWarning = false,
-}: Props) {
-  const { axis, axisLabel, rb1, rb2 } = data
-  const labelColor = theme?.text
-  const speedLabelColor = theme?.subtext
+interface Props {
+  data: AxisSideData
+  side: 'rb1' | 'rb2'
+  threshold: number
+  /** 編集パネルで変更されたRB色。省略時はside側のデフォルト色 */
+  color?: string
+  /** 80%でON、70%以下を3秒維持してOFFする軸警告状態 */
+  isWarning?: boolean
+  /** ロボット模式図の関節間隔（AXIS_ROW_FLEX）に合わせた行の高さ配分 */
+  flexGrow: number
+}
+
+export default function AxisRow({ data, side, threshold, color, isWarning = false, flexGrow }: Props) {
+  const defaultColor = side === 'rb1' ? RB1_COLOR : RB2_COLOR
+  const baseColor = color ?? defaultColor
+  const torqueColor = isWarning ? WARN_COLOR : baseColor
+
+  const speedBar = (
+    <SpeedBar
+      value={data.speed}
+      color={baseColor}
+      valueSide={side === 'rb1' ? 'right' : 'left'}
+      reverse={side === 'rb1'}
+    />
+  )
+
+  const torqueBar = (
+    <TorqueBar
+      side={side === 'rb1' ? 'left' : 'right'}
+      value={data.torqueValue}
+      peak={data.torquePeak}
+      color={torqueColor}
+      threshold={threshold}
+    />
+  )
 
   return (
-    <div className={`axis-row${isWarning ? ' axis-row--warning' : ''}`}>
-      <SpeedBar value={rb1.speed} color={rb1Color} valueSide="right" reverse />
-
-      <TorqueBar
-        side="left"
-        value={rb1.torqueValue}
-        peak={rb1.torquePeak}
-        color={isWarning ? WARN_COLOR : rb1Color}
-        threshold={threshold}
-        mutedColor={speedLabelColor}
-      />
-
-      <div className="axis-row__center">
-        <div className="axis-row__icon-box" style={{ borderColor: `${labelColor ?? '#9aa4b2'}55` }}>
-          {/* public/{軸名}.png を軸アイコンとして表示。軸名は編集パネルで変更可能なため、
-             画像が用意されていない軸名の場合はimgを非表示にして文字ラベルのみ残す */}
-          <img
-            className="axis-row__icon-img"
-            src={`/${axisLabel ?? `軸${axis}`}.png`}
-            alt=""
-            onError={(e) => {
-              e.currentTarget.style.display = 'none'
-            }}
-          />
-          <div className="axis-row__label" style={{ color: labelColor }}>
-            {axisLabel ?? `軸${axis}`}
-          </div>
-        </div>
-      </div>
-
-      <TorqueBar
-        side="right"
-        value={rb2.torqueValue}
-        peak={rb2.torquePeak}
-        color={isWarning ? WARN_COLOR : rb2Color}
-        threshold={threshold}
-        mutedColor={speedLabelColor}
-      />
-
-      <SpeedBar value={rb2.speed} color={rb2Color} valueSide="left" />
+    <div
+      className={`axis-row axis-row--${side}${isWarning ? ' axis-row--warning' : ''}`}
+      style={{ flexGrow, flexBasis: 0 }}
+    >
+      {side === 'rb1' ? (
+        <>
+          {speedBar}
+          {torqueBar}
+        </>
+      ) : (
+        <>
+          {torqueBar}
+          {speedBar}
+        </>
+      )}
     </div>
   )
 }

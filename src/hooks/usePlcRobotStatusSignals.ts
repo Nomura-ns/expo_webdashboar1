@@ -1,88 +1,59 @@
 // usePlcRobotStatusSignals.ts
 //
-// usePlcWebSocket から得た生データ（アドレス→値のマップ）を、
-// RB1/RB2の「軸ごとのトルク値・ピーク値」に変換するフック。
+// usePlcWebSocket から得た生データを、
+// RB1/RB2の「軸ごとのトルク値・ピーク値・速度(%)」に変換するフック。
 //
-// トルク値・ピーク値はPLC上で
-// 2ワード = 32bit signed integer
-// として格納されている前提。
-//
-// 稼働率はこのフックでは扱わない。
+// 速度は deg/s で送られてくるため、
+// speed(%) = speedCurrent / speedMax * 100
+// に変換してからAxisFullStatとして返す。
 
 import { useMemo } from 'react'
 
 import type { DataPoint } from '../types'
 
-import {
-  getLatestDataPoint,
-  readAddress,
-} from '../utils/usePlcSignalUtils'
+import { getLatestDataPoint, readAddress } from '../utils/usePlcSignalUtils'
 
-import {
-  ROBOT_AXIS_ADDRESSES,
-  type RobotKey,
-} from '../config/robotStatusAddresses'
+import { ROBOT_AXIS_ADDRESSES, type RobotKey } from '../config/robotStatusAddresses'
 
-export interface AxisTorqueStat {
+export interface AxisFullStat {
+  /** MAX比(%)。speedCurrent / speedMax * 100 で算出 */
+  speed: number
   torque: number
   peakTorque: number
 }
 
 export interface PlcRobotStatusSignals {
-  rb1AxisTorques: AxisTorqueStat[]
-  rb2AxisTorques: AxisTorqueStat[]
+  rb1AxisStats: AxisFullStat[]
+  rb2AxisStats: AxisFullStat[]
 }
 
-/**
- * usePlcWebSocket の生データ（DataPoint[]）から、
- * RB1/RB2の各軸トルク・ピーク値を取り出す。
- *
- * 軸の並び：
- *
- * 0 = S
- * 1 = L
- * 2 = U
- * 3 = R
- * 4 = B
- * 5 = T
- *
- * 例：
- *
- * RB1 S軸
- * torque     → D15100～D15101
- * peakTorque → D15120～D15121
- *
- * RB2 S軸
- * torque     → D15140～D15141
- * peakTorque → D15160～D15161
- */
+/** speedMaxが0（未取得等）の場合は0%として扱う */
+function toSpeedPercent(current: number, max: number): number {
+  if (!max) return 0
+  return (current / max) * 100
+}
+
 export function usePlcRobotStatusSignals(
   data: DataPoint[],
 ): PlcRobotStatusSignals {
   return useMemo(() => {
     const latest = getLatestDataPoint(data)
 
-    /**
-     * 指定したロボットの6軸分の
-     * 現在トルク / 最大トルクを取得する。
-     */
- const buildAxisStats = (
-    robot: RobotKey,
-    ): AxisTorqueStat[] =>
-    ROBOT_AXIS_ADDRESSES[robot].map((addr) => ({
-    torque: readAddress(
-      latest,
-      addr.torque,
-    ),
-    peakTorque: readAddress(
-      latest,
-      addr.peakTorque,
-    ),
-  }))
+    const buildAxisStats = (robot: RobotKey): AxisFullStat[] =>
+      ROBOT_AXIS_ADDRESSES[robot].map((addr) => {
+        const speedCurrent = readAddress(latest, addr.speedCurrent)
+        const speedMax = readAddress(latest, addr.speedMax)
+
+        return {
+          speed: toSpeedPercent(speedCurrent, speedMax),
+          torque: readAddress(latest, addr.torque),
+          peakTorque: readAddress(latest, addr.peakTorque),
+        }
+      })
 
     return {
-      rb1AxisTorques: buildAxisStats('RB1'),
-      rb2AxisTorques: buildAxisStats('RB2'),
+      rb1AxisStats: buildAxisStats('RB1'),
+      rb2AxisStats: buildAxisStats('RB2'),
     }
   }, [data])
 }

@@ -126,6 +126,67 @@
   background: rgba(224, 80, 63, 0.14);
 }
 
+/* --- サイクルタイム（取付／取出）：見出し＋カード2枚を横並び ---
+   旧・bestサイクルタイム／現在サイクルタイムカードを廃止し、取付・取出それぞれのカードを横に並べ、
+   各カード内はサイクル対象名／BESTタイム／現在タイムを縦3行で表示する。グラフの色分けと混同しないよう
+   カードの枠自体には色を付けない。 */
+.op-results__cycletime-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.op-results__cycletime-heading {
+  font-size: 20px;
+  font-weight: 700;
+  padding-left: 2px;
+}
+
+.op-results__cycletime-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.op-results__cycletime-card {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.op-results__cycletime-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.op-results__cycletime-best {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 20px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.op-results__cycletime-best-label {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.op-results__cycletime-current {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
 /* --- フロー（中央） --- */
 
 .op-results__flow-col {
@@ -205,6 +266,15 @@
   height: 12px;
   border-radius: 3px;
   flex-shrink: 0;
+}
+
+/* 検査回数（＝OK回数＋NG回数）ラベル。専用カード・円グラフ内の区分は設けず、
+   legendのすぐ下にテキストのみ表示する */
+.op-results__okng-inspect-total {
+  display: block;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
 }
 
 /* 刃物画像：説明文・NORMAL表記は廃止。枠線・点滅は外側の op-results__okng-col--ng に統合済みのため、

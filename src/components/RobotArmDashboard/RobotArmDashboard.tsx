@@ -12,6 +12,7 @@ type Props = {
   isEditing: boolean
   onEditingChange: (value: boolean) => void
   plcStatusById?: Record<string, CameraStatus> 
+  onStatusChange?: (status: CameraStatus) => void
 }
 
 // 背景色（theme.bg）が明るい色かどうかを簡易判定
@@ -34,27 +35,20 @@ const MAX_CAMERAS = 8
 const ROTATE_INTERVAL_MS = 6000
 
 // カメラの状態は正常 / 異常の2値で管理する
-type CameraStatus = '運転' | '異常' | '待機' |'停止'
+// 変更後
+export type CameraStatus = '運転' | '異常' | '待機' | '停止'
+
+// 状態ごとの表示クラス（運転=緑 / 停止=白 / 待機=青 / 異常=赤）
+const STATUS_CLASS: Record<CameraStatus, string> = {
+  '運転': 'is-running',
+  '停止': 'is-stopped',
+  '待機': 'is-standby',
+  '異常': 'is-abnormal',
+}
 
 // 異常時の枠色。ダーク系テーマ / ライト系テーマそれぞれの「赤」に寄せて出し分ける
 const ABNORMAL_COLOR_DARK = '#ff4d4f'
 const ABNORMAL_COLOR_LIGHT = '#c81e1e'
-
-
-/*const STANDBY_COLOR = '#f0ad4e' // 待機：アンバー
-const getStatusColor = (status: CameraStatus, theme: Theme, abnormalColor: string) => {
-  switch (status) {
-    case '異常':
-      return abnormalColor
-    case '待機':
-      return STANDBY_COLOR
-    case '停止':
-      return theme.subtext
-    case '運転':
-    default:
-      return theme.accent
-  }
-}*/
 
 const createInitialCameras = (): CameraFeed[] => [
   {
@@ -95,7 +89,7 @@ const nextCameraDefaults = (index: number): CameraFeed => ({
   totalSteps: 5,
 })
 
-export default function RobotArmDashboard({ theme, isEditing, onEditingChange, plcStatusById }: Props) {
+export default function RobotArmDashboard({ theme, isEditing, onEditingChange, plcStatusById, onStatusChange,}: Props) {
   const isMobile = useIsMobile()
 
   const [cameras, setCameras] = useState<CameraFeed[]>(createInitialCameras())
@@ -143,7 +137,20 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
     })
   )
  }, [plcStatusById])
+   // --- 他ページのヘッダー●表示用：カメラ全体の状態を1つに集約して親(App)へ通知 ---
+  // 優先度：異常 > 運転 > 待機 > 停止（全台停止のときだけ「停止」）
+  // 優先度を変えたい場合はこの判定順を入れ替えるだけでOK
+  const overallStatus: CameraStatus = cameras.some(c => c.status === '異常')
+    ? '異常'
+    : cameras.some(c => c.status === '運転')
+    ? '運転'
+    : cameras.some(c => c.status === '待機')
+    ? '待機'
+    : '停止'
 
+  useEffect(() => {
+    onStatusChange?.(overallStatus)
+  }, [overallStatus, onStatusChange])
   const canvasBg = isLightColor(theme.bg) ? 'rgba(0, 0, 0, 0.15)' : 'rgba(255, 255, 255, 0.14)'
   const abnormalColor = isLightColor(theme.bg) ? ABNORMAL_COLOR_LIGHT : ABNORMAL_COLOR_DARK
   // RB1/RB2統合ステータスカード（ガラス風）用の色。テーマの明暗で出し分ける
@@ -362,9 +369,9 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                 <div className="robot-dashboard__mobile-status-info">
                   <span className="robot-dashboard__mobile-status-info-item">
                     <span className="robot-dashboard__mobile-status-info-label">状態</span>
-                    <span className={activeCamera.status === '異常' ? 'is-abnormal' : 'is-normal'}>
-                      {activeCamera.status}
-                    </span>
+                       <span className={STATUS_CLASS[activeCamera.status ?? '運転']}>
+                        {activeCamera.status ?? '運転'}
+                     </span>
                   </span>
                   <span className="robot-dashboard__mobile-status-info-item">
                     <span className="robot-dashboard__mobile-status-info-label">工程内容</span>
@@ -429,7 +436,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
             <div className="robot-dashboard__status-col" style={{ background: canvasBg }}>
               {/* RB1・RB2以外（3台目以降）は従来どおり個別カードで表示 */}
               {cameras.slice(2).map(cam => {
-                const isAbnormal = cam.status === '異常'
+                
                 return (
                   <div
                     key={cam.id}
@@ -439,7 +446,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                     <div className="robot-dashboard__info-card-header">{cam.label}</div>
                     <div className="robot-dashboard__info-row">
                       <span className="robot-dashboard__info-row-label">状態</span>
-                      <span className={isAbnormal ? 'is-abnormal' : 'is-normal'}>{cam.status}</span>
+                      <span className={STATUS_CLASS[cam.status ?? '運転']}>{cam.status ?? '運転'}</span>
                     </div>
                     <div className="robot-dashboard__info-row">
                       <span className="robot-dashboard__info-row-label">工程内容</span>
@@ -459,7 +466,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                   {[cameras[0], cameras[1]]
                     .filter((cam): cam is CameraFeed => Boolean(cam))
                     .map((cam, i) => {
-                      const isAbnormal = cam.status === '異常'
+                      
                       return (
                         <div className="robot-dashboard__rb-status-block" key={cam.id}>
                           <div className="robot-dashboard__info-card-header">
@@ -467,9 +474,7 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                           </div>
                           <div className="robot-dashboard__info-row">
                             <span className="robot-dashboard__info-row-label">状態</span>
-                            <span className={isAbnormal ? 'is-abnormal' : 'is-normal'}>
-                              {cam.status}
-                            </span>
+                            <span className={STATUS_CLASS[cam.status ?? '運転']}>{cam.status ?? '運転'}</span>
                           </div>
                           <div className="robot-dashboard__info-row">
                             <span className="robot-dashboard__info-row-label">工程内容</span>
@@ -646,11 +651,12 @@ export default function RobotArmDashboard({ theme, isEditing, onEditingChange, p
                        />
                      </label>
 
-<button
-  type="button"
-  className={`robot-dashboard__status-toggle${cam.status === '異常' ? ' is-abnormal' : ' is-normal'}`}
-                        onClick={() => toggleStatus(cam.id)}
-                      >
+
+                      <button
+                         type="button"
+                         className={`robot-dashboard__status-toggle ${STATUS_CLASS[cam.status ?? '運転']}`}
+                         onClick={() => toggleStatus(cam.id)}
+                        >
                         <span className="robot-dashboard__status-dot" />
                         {cam.status}
                       </button>

@@ -34,11 +34,8 @@ interface Props {
   selectedRB?: RobotKey | null
 }
 
-const PEAK_PROXIMITY_THRESHOLD = 10
 
-function isNearPeak(value: number, peak: number) {
-  return Math.abs(peak - value) <= PEAK_PROXIMITY_THRESHOLD
-}
+
 
 export default function AxisTable({
   rows,
@@ -86,8 +83,7 @@ export default function AxisTable({
           {rows.map((row) => {
             // 現在値/Peak値表記の「/」はモニタ版（TorqueBar）の表記と統一している
             const isWarning = warningAxes[row.axis - 1] ?? false
-            const rb1PeakNear = isNearPeak(row.rb1.torqueValue, row.rb1.torquePeak)
-            const rb2PeakNear = isNearPeak(row.rb2.torqueValue, row.rb2.torquePeak)
+            
             return (
               <tr key={row.axis}>
                 <td className="axis-table__label" style={{ color: theme.text, borderColor: theme.border }}>
@@ -101,7 +97,7 @@ export default function AxisTable({
                   style={{ color: rb1Color, borderColor: theme.border, opacity: rb1Dim ? DIM_OPACITY : 1 }}
                 >
                   {row.rb1.torqueValue}% /{' '}
-                  <span className={rb1PeakNear ? 'axis-table__peak-value--near' : undefined}>
+                   <span className="axis-table__peak-value">
                     {row.rb1.torquePeak}%
                   </span>
                 </td>
@@ -113,7 +109,7 @@ export default function AxisTable({
                   style={{ color: rb2Color, borderColor: theme.border, opacity: rb2Dim ? DIM_OPACITY : 1 }}
                 >
                   {row.rb2.torqueValue}% /{' '}
-                  <span className={rb2PeakNear ? 'axis-table__peak-value--near' : undefined}>
+                   <span className="axis-table__peak-value">
                     {row.rb2.torquePeak}%
                   </span>
                 </td>

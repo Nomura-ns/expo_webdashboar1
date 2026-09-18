@@ -66,6 +66,8 @@ interface OperationResultsProps {
    *  PLCアドレス未定のため未指定時はサンプル値を使用 */
   hourlyTrend?: HourlyTrendPoint[]
   onEditingChange: (value: boolean) => void
+    /** サイクル終了時刻（PLC生値）。サイクル履歴の完了検知に使用 */
+  cycleEndTimeRaw?: number
 }
 
 const CHART_W = 560
@@ -221,7 +223,8 @@ export default function OperationResults({
   ngSignal,
   bladeImageUrl,
   hourlyTrend,
-  onEditingChange,
+  cycleEndTimeRaw,
+  onEditingChange,  
 }: OperationResultsProps) {
   const isMobile = useIsMobile()
   const [customColors, setCustomColors] = useState<Record<string, string>>({})
@@ -236,7 +239,7 @@ export default function OperationResults({
   }, [])
 
   /** サイクル履歴（⑤） */
-  const { history } = useCycleHistory(overallCycleTimeSec)
+   const { history } = useCycleHistory(overallCycleTimeSec, cycleEndTimeRaw)
 
   /** 新規追加された行だけにスライドインアニメーションを付ける */
   const [flashNo, setFlashNo] = useState<number | null>(null)
@@ -307,21 +310,22 @@ export default function OperationResults({
   const hourlyWindowIndex =
     operatingTimeSec !== undefined ? Math.floor(operatingTimeSec / HOURLY_WINDOW_UPDATE_SEC) : undefined
 
-  const hourlyData = useMemo(() => {
-    const source = hourlyTrend && hourlyTrend.length > 0 ? hourlyTrend : SAMPLE_HOURLY_TREND
-    const visible = source.slice(-HOURLY_VISIBLE_POINTS)
-    if (visible.length === 0) return visible
+const hourlyData = useMemo(() => {
+  const source = hourlyTrend && hourlyTrend.length > 0 ? hourlyTrend : SAMPLE_HOURLY_TREND
+  const visible = source.slice(-HOURLY_VISIBLE_POINTS)
+  if (visible.length === 0) return visible
 
-    const now = new Date()
-    const labeled = visible.map((p, i) => ({
-      ...p,
-      time: roundToHalfHourLabel(now, visible.length - 1 - i),
-    }))
+  const now = new Date()
+  const labeled = visible.map((p, i) => ({
+    ...p,
+    time: roundToHalfHourLabel(now, visible.length - 1 - i),
+  }))
 
-    // 6点目：値は最終点を複製するが time は空文字にして非表示扱い（ラベル用の余白確保だけが目的）
-    return [...labeled, { ...labeled[labeled.length - 1], time: '' }]
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hourlyTrend, hourlyWindowIndex])
+  // 常に末尾へ余白確保用のダミー(time: '')を1点追加する。
+  // 実点1〜4点の間はスロット数もそれに応じて2〜5に伸び、5点そろって初めて
+  // 6スロット（実点5＋ダミー1）で固定される。
+  return [...labeled, { ...labeled[labeled.length - 1], time: '' }]
+}, [hourlyTrend, hourlyWindowIndex])
 
   const hourlyItems: ChartItem[] = useMemo(
     () =>
@@ -340,14 +344,19 @@ export default function OperationResults({
   const hourlyXAt = (i: number) => HOURLY_PAD_L + (hourlyPlotW / Math.max(hourlyData.length - 1, 1)) * i
   const hourlyYAt = (v: number) => HOURLY_PAD_T + hourlyPlotH - (Math.min(Math.max(v, 0), hourlyMaxY) / hourlyMaxY) * hourlyPlotH
   const hourlySeries = hourlyItems.map((it) => {
-    const points = it.values.map((v, i) => ({ x: hourlyXAt(i), y: hourlyYAt(v) }))
-    return {
-      ...it,
-      points,
-      // 折れ線・マーカーは先頭5点分だけ描画（＝6点目への線分と6点目自体のマーカーは非表示）
-      visiblePoints: points.slice(0, HOURLY_VISIBLE_POINTS),
-    }
-  })
+  const points = it.values.map((v, i) => ({
+    x: hourlyXAt(i),
+    y: hourlyYAt(v),
+    time: hourlyData[i].time,
+    value: v,
+  }))
+  return {
+    ...it,
+    points,
+    // ダミーはtime: ''で判別。常に末尾1点だけを除外する
+    visiblePoints: points.filter((p) => p.time !== ''),
+  }
+})
 
   const handleColorChange = (id: string, color: string) => {
     setCustomColors((prev) => ({ ...prev, [id]: color }))
@@ -714,32 +723,29 @@ export default function OperationResults({
                 </g>
               )
             })}
-            {hourlyData.map((p, i) => {
-              const isLast = i === hourlyData.length - 1
-              return (
-                <text
-                  key={`${p.time}-${i}`}
-                  x={hourlyXAt(i)}
-                  y={HOURLY_CHART_H - 8}
-                  textAnchor="middle"
-                  fontSize={CHART_AXIS_FONT_SIZE}
-                  fill={theme.subtext}
-                  opacity={isLast ? 0 : 1}
-                >
-                  {p.time}
-                </text>
-              )
-            })}
-            {hourlySeries.map((s) => (
-              <g key={s.id}>
-                <polyline points={s.visiblePoints.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={s.color} strokeWidth={3} />
-                {s.visiblePoints.map((p, i) => (
-                  <circle key={i} cx={p.x} cy={p.y} r={4} fill={s.color}>
-                    <title>{`${hourlyData[i].time} ${s.label}: ${s.values[i]}回`}</title>
-                  </circle>
-                ))}
-              </g>
+           {hourlyData.map((p, i) => (
+            <text
+            key={`${p.time}-${i}`}
+            x={hourlyXAt(i)}
+            y={HOURLY_CHART_H - 8}
+            textAnchor="middle"
+            fontSize={CHART_AXIS_FONT_SIZE}
+            fill={theme.subtext}
+            opacity={p.time === '' ? 0 : 1}
+            >
+            {p.time}
+            </text>
             ))}
+          {hourlySeries.map((s) => (
+           <g key={s.id}>
+           <polyline points={s.visiblePoints.map((p) => `${p.x},${p.y}`).join(' ')} fill="none" stroke={s.color} strokeWidth={3} />
+           {s.visiblePoints.map((p, i) => (
+           <circle key={i} cx={p.x} cy={p.y} r={4} fill={s.color}>
+           <title>{`${p.time} ${s.label}: ${p.value}回`}</title>
+            </circle>
+          ))}
+          </g>
+          ))}
           </svg>
         )}
       </div>

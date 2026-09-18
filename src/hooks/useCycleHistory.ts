@@ -1,13 +1,14 @@
 // useCycleHistory.ts
 //
-// 「ダッシュボード改修仕様書」の下記2項目に対応する新規フック：
+// 「ダッシュボード改修仕様書」の下記2項目に対応するフック：
 //   ・⑤サイクルタイムを最下部ティッカー表示 → サイクルタイム機能追加（ベストサイクルタイム）
 //   ・サイクル履歴追加（新規パネル）＋ステータス判定ロジック
 //
-// PLC側に「サイクル開始/終了」の専用タイムスタンプが無いため、
-// overallCycleTimeSec（usePlcOperationMetricsSignalsが返す値）が変化した瞬間を
-// 「1サイクル完了」とみなして記録している。実際にPLCの開始/終了アドレスが
-// 確定したら、その値に置き換えてください。
+// PLCから「サイクル開始時刻」「サイクル終了時刻」が送られてくるようになったため、
+// 1サイクル完了の検知は「サイクル終了時刻（cycleEndTimeRaw）の値が変化した瞬間」を基準にする。
+// ※以前はcycleTimeSec（サイクルタイムの値そのもの）の変化を基準にしていたが、
+//   偶然2回連続で同じサイクルタイムになった場合にサイクルが1件取りこぼされる不具合があったため、
+//   毎回必ず変化する終了時刻を基準にするよう変更した。
 //
 // ステータス判定ロジック（仕様書どおり）:
 //   1件目            … 判定なし（pending）
@@ -50,11 +51,14 @@ interface UseCycleHistoryResult {
 }
 
 /**
- * @param cycleTimeSec 最新のサイクルタイム（秒）。値が変化するたびに1件記録する。
+ * @param cycleTimeSec 最新のサイクルタイム（秒）。履歴の各行に記録する値。
+ * @param cycleEndTimeRaw PLCから受け取るサイクル終了時刻の生値。この値が変化した瞬間を
+ *                        「1サイクル完了」として記録する（サイクルタイムの値自体の変化ではない）。
  * @param keepMax 保持する履歴の最大件数（古いものから削除）
  */
 export function useCycleHistory(
   cycleTimeSec: number | undefined,
+  cycleEndTimeRaw: number | string | undefined,
   keepMax: number = DEFAULT_KEEP_MAX
 ): UseCycleHistoryResult {
   const [history, setHistory] = useState<CycleRecord[]>([])
@@ -62,15 +66,17 @@ export function useCycleHistory(
 
   /** 正常判定された値だけを蓄積する基準値プール（4件目以降の平均値算出に使用） */
   const normalValuesRef = useRef<number[]>([])
-  const prevValueRef = useRef<number | undefined>(undefined)
+  const prevEndRef = useRef<typeof cycleEndTimeRaw>(undefined)
   const lastEdgeAtRef = useRef<number>(Date.now())
   const noRef = useRef(0)
 
   useEffect(() => {
-    if (cycleTimeSec === undefined || cycleTimeSec <= 0) return
-    // 値が変化した時だけを「1サイクル完了」として扱う（PLCポーリング毎の重複記録を防ぐ）
-    if (prevValueRef.current === cycleTimeSec) return
-    prevValueRef.current = cycleTimeSec
+    if (cycleEndTimeRaw === undefined || cycleTimeSec === undefined || cycleTimeSec <= 0) return
+    // 終了時刻そのものが変化した時だけを「1サイクル完了」として扱う
+    // （PLCポーリング毎の重複記録を防ぐ。サイクルタイムの値が偶然同じでも
+    //  終了時刻は毎回異なるため取りこぼさない）
+    if (prevEndRef.current === cycleEndTimeRaw) return
+    prevEndRef.current = cycleEndTimeRaw
 
     const now = Date.now()
     const startedAt = lastEdgeAtRef.current
@@ -114,7 +120,7 @@ export function useCycleHistory(
     setBestCycleTimeSec((prevBest) =>
       prevBest === undefined || cycleTimeSec < prevBest ? cycleTimeSec : prevBest
     )
-  }, [cycleTimeSec, keepMax])
+  }, [cycleEndTimeRaw, cycleTimeSec, keepMax])
 
   return { history, bestCycleTimeSec }
 }

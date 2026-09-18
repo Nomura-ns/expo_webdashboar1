@@ -22,6 +22,8 @@ import {
   NG_SIGNAL_ADDRESS,
   CYCLE_CHANGE_BIT_ADDRESS,
   CYCLE_TIME_ADDRESS,
+  CYCLE_START_TIME_ADDRESS,
+  CYCLE_END_TIME_ADDRESS,
 } from '../config/operationMetricsAddresses'
 
 export interface PlcOperationMetrics {
@@ -43,6 +45,10 @@ export interface PlcOperationMetrics {
   ngSignal: boolean
   /** サイクルタイム（秒）。PLC値があればそれを優先し、無ければコード側の蓄積値を使用 */
   cycleTimeSec: number
+    /** サイクル開始時刻（PLC生値）。PLC接続監視（usePlcConnectionStatus）に使用 */
+  cycleStartTimeRaw: number
+  /** サイクル終了時刻（PLC生値）。サイクル履歴の完了検知に使用 */
+  cycleEndTimeRaw: number
 }
 
 export function usePlcOperationMetricsSignals(data: DataPoint[]): PlcOperationMetrics {
@@ -61,6 +67,8 @@ export function usePlcOperationMetricsSignals(data: DataPoint[]): PlcOperationMe
   const ngSignal = readAddress(latest, NG_SIGNAL_ADDRESS) === 1
   const cycleChangeBit = readAddress(latest, CYCLE_CHANGE_BIT_ADDRESS)
   const plcCycleTimeSec = readAddress(latest, CYCLE_TIME_ADDRESS)
+  const cycleStartTimeRaw = readAddress(latest, CYCLE_START_TIME_ADDRESS)
+  const cycleEndTimeRaw = readAddress(latest, CYCLE_END_TIME_ADDRESS)
 
   // OK割合（%）×検査回数からOK回数を算出。NG回数は「検査回数－OK回数」で求める
   // （OK割合・NG割合を個別に四捨五入すると合計が検査回数からズレることがあるため）。
@@ -94,5 +102,7 @@ export function usePlcOperationMetricsSignals(data: DataPoint[]): PlcOperationMe
     ngCount,
     ngSignal,
     cycleTimeSec,
+    cycleStartTimeRaw,
+    cycleEndTimeRaw,
   }
 }

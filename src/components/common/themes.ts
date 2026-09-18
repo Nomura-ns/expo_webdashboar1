@@ -6,7 +6,7 @@ import type { ThemeKey, Theme, ThemeMode  } from '../../types'
 
 export const THEMES: Record<ThemeKey, Theme> = {
   'dark-exhibition': { label: ' 🚀展示会', bg: '#000000', surface: '#0e0f14', border: '#3f6a94', text: '#ffffffff', subtext: '#ffffffff', accent: '#60a5fa', headerBg: '#0e0f14', logo: '/ns_slitter_silver.png', qr: '/QR_dark.png' , mobile:'/モバイル版_dark.png' }, 
-  'dark-blue':   { label: '🌙 ダーク青', bg: '#1a1d3a', surface: '#23274f', border: '#245d9b', text: '#f1f5f9', subtext: '#94a3b8', accent: '#38bdf8', headerBg: '#23274f', logo: '/ns_slitter_silver.png', qr: '/QR_dark.png' , mobile:'/モバイル版_dark.png'},
+  'dark-blue':   { label: '🌙 ダーク青', bg: '#1a1d3a', surface: '#23274f', border: '#245d9b', text: '#ffffffff', subtext: '#ffffffff', accent: '#38bdf8', headerBg: '#23274f', logo: '/ns_slitter_silver.png', qr: '/QR_dark.png' , mobile:'/モバイル版_dark.png'},
   'dark-red':    { label: '🌙 ダーク赤', bg: '#200f0f', surface: '#2d1515', border: '#5c2a2a', text: '#fef2f2', subtext: '#fca5a5', accent: '#f87171', headerBg: '#2d1515', logo: '/ns_slitter_silver.png' , qr: '/QR_dark.png', mobile:'/モバイル版_dark.png'},
   'dark-green':  { label: '🌙 ダーク緑', bg: '#0a1a0f', surface: '#152d1e', border: '#1f4a30', text: '#f0fdf4', subtext: '#86efac', accent: '#34d399', headerBg: '#152d1e', logo: '/ns_slitter_silver.png', qr: '/QR_dark.png' , mobile:'/モバイル版_dark.png'},
   'light-blue':  { label: '☀️ ライト青', bg: '#eff6ff', surface: '#ffffff', border: '#bfdbfe', text: '#1e3a5f', subtext: '#3b82f6', accent: '#2563eb', headerBg: '#dbeafe', logo: '/image001.png', qr: '/QR_light.png' , mobile:'/モバイル版_light.png'},

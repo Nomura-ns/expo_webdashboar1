@@ -24,6 +24,8 @@ export const OK_RATIO_ADDRESS = 15190
 export const NG_RATIO_ADDRESS = 15192
 /** NG判定信号（0 = OK, 1 = NG）（アドレス未定のため仮番号） */
 export const NG_SIGNAL_ADDRESS = 205
+export const CYCLE_START_TIME_ADDRESS = 'D9999' // 仮：サイクル開始時刻
+export const CYCLE_END_TIME_ADDRESS = 'D9998'   // 仮：サイクル終了時刻
 /**
  * サイクル変更タイミング用bit（アドレス未定のため仮番号）。
  * 0→1に立ち上がったタイミングを「サイクルの区切り」として扱う。

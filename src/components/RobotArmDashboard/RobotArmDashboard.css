@@ -115,14 +115,43 @@
   opacity: 0.65;
 }
 
-.robot-dashboard__info-row .is-normal {
-  color: #4ade80;
+
+.robot-dashboard__info-row .is-running,
+.robot-dashboard__mobile-status-info-item .is-running {
+  color: #4ade80; /* 運転：緑 */
   font-weight: 600;
 }
 
-.robot-dashboard__info-row .is-abnormal {
-  color: #ff6b6b;
+.robot-dashboard__info-row .is-stopped,
+.robot-dashboard__mobile-status-info-item .is-stopped {
+  color: #f5f5f5; /* 停止：白（暗背景想定。薄い影で視認性確保） */
   font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.robot-dashboard__info-row .is-standby,
+.robot-dashboard__mobile-status-info-item .is-standby {
+  color: #60a5fa; /* 待機：青 */
+  font-weight: 600;
+}
+
+.robot-dashboard__info-row .is-abnormal,
+.robot-dashboard__mobile-status-info-item .is-abnormal {
+  color: #ff6b6b; /* 異常：赤 */
+  font-weight: 600;
+  animation: robot-dashboard-text-flicker 1.2s ease-in-out infinite;
+}
+
+@keyframes robot-dashboard-text-flicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .robot-dashboard__info-row .is-abnormal,
+  .robot-dashboard__mobile-status-info-item .is-abnormal {
+    animation: none;
+  }
 }
 
 /* --- メインカメラモニター領域 --- */
@@ -446,8 +475,17 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
-.robot-dashboard__status-toggle.is-normal {
+/* 変更後 */
+.robot-dashboard__status-toggle.is-running {
   color: #4ade80;
+}
+
+.robot-dashboard__status-toggle.is-stopped {
+  color: #f5f5f5;
+}
+
+.robot-dashboard__status-toggle.is-standby {
+  color: #60a5fa;
 }
 
 .robot-dashboard__status-toggle.is-abnormal {
@@ -559,15 +597,7 @@
   opacity: 0.65;
 }
 
-.robot-dashboard__mobile-status-info-item .is-normal {
-  color: #4ade80;
-  font-weight: 600;
-}
 
-.robot-dashboard__mobile-status-info-item .is-abnormal {
-  color: #ff6b6b;
-  font-weight: 600;
-}
 
 @media (max-width: 900px) {
   .robot-dashboard__body {

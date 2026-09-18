@@ -5,20 +5,21 @@ import { THEMES, PAGES, getThemeMode } from './components/common/themes'
 import Sidebar, { SIDEBAR_WIDTH } from './components/common/Sidebar'
 import SettingsPanel from './components/common/SettingsPanel'
 import OperationResults, { type MetricPoint } from './components/OperationResults/OperationResults'
-import RobotArmDashboard from './components/RobotArmDashboard/RobotArmDashboard'
+import RobotArmDashboard, { type CameraStatus } from './components/RobotArmDashboard/RobotArmDashboard'
 import OperationStatus from './components/OperationStatus/OperationStatus'
 import NameplateQuiz from './components/NameplateQuiz/NameplateQuiz'
 import LiveClock from './components/OperationStatus/LiveClock'
-import { usePlcWebSocket } from './hooks/usePlcWebSocket' 
+import { usePlcWebSocket } from './hooks/usePlcWebSocket'
 import { useIsMobile } from './hooks/useMediaQuery'
 import { usePlcRobotStatusSignals } from './hooks/usePlcRobotStatusSignals'
 import { usePlcOperationMetricsSignals } from './hooks/usePlcOperationMetricsSignals'
-import { useOperationHourlyTrend } from './hooks/useOperationHourlyTrend' 
+import { useOperationHourlyTrend } from './hooks/useOperationHourlyTrend'
 import { usePlcJobFlowSignals, JOB_FLOW_ADDRESSES } from './hooks/usePlcJobFlowSignals'
 import { OPERATION_METRICS_ADDRESSES } from './config/operationMetricsAddresses'
 import { getRecentDates, METRIC_DAYS } from './utils/dateRange'
 import { ALL_ROBOT_STATUS_ADDRESSES } from './config/robotStatusAddresses'
-
+import PlcConnectionIcon from './components/common/PlcConnectionIcon'
+import { usePlcConnectionStatus } from './hooks/usePlcConnectionStatus'
 
 // 稼働状況（anomalyページ）用のサンプルデータ
 // RB1・RB2は同一機種のため、画像は1枚を共通で使用する
@@ -63,8 +64,8 @@ const sampleQuestions: NameplateQuestion[] = [
       dark: '停止.mp4'
     },
     iconUrl: {
-      light: 'stop_light.png', 
-      dark: 'stop.png'    
+      light: 'stop_light.png',
+      dark: 'stop.png'
     }
   },
   {
@@ -78,8 +79,8 @@ const sampleQuestions: NameplateQuestion[] = [
       dark: 'エラーリセット.mp4'
     },
     iconUrl: {
-      light: 'error reset_light.png', 
-      dark: 'error reset.png'    
+      light: 'error reset_light.png',
+      dark: 'error reset.png'
     }
   },
   {
@@ -93,11 +94,12 @@ const sampleQuestions: NameplateQuestion[] = [
       dark: 'カウンタリセット.mp4'
     },
     iconUrl: {
-      light: 'counter reset_light.png', 
-      dark: 'counter reset.png'    
+      light: 'counter reset_light.png',
+      dark: 'counter reset.png'
     }
   },
 ]
+
 // URLの ?page=xxx を読み取り、4分割パネルごとに違う初期ページを開けるようにする
 // 例）
 //   .../?page=dashboard  → RobotArmDashboard
@@ -134,6 +136,14 @@ export default function App() {
   const headerRef = useRef<HTMLElement>(null)
   const mode = getThemeMode(themeKey)
   const isMobile = useIsMobile()
+  const [dashboardStatus, setDashboardStatus] = useState<CameraStatus>('運転')
+
+  const STATUS_DOT_COLOR: Record<CameraStatus, string> = {
+    '運転': '#4ade80',
+    '停止': '#f5f5f5',
+    '待機': '#60a5fa',
+    '異常': mode === 'light' ? '#c81e1e' : '#ff4d4f',
+  }
 
   // モバイル版ではMONITOR画面を使わず、ROBOT PERFORMANCEを初期画面にする
   useEffect(() => {
@@ -173,28 +183,8 @@ export default function App() {
   }, [isMobile])
 
   const recentDates = getRecentDates(METRIC_DAYS)
-  const DATES = recentDates.map((d) => d.label)  //['MM/DD', 'MM/DD', 'MM/DD']
-  // 稼働実績4指標＋検査OK/NGのサンプルデータ（ダミー値）。
-  // 検査回数はOK回数＋NG回数から算出する表示に変更したため、MetricPointからは除外した。
-  const SAMPLE_METRICS: Record<Exclude<keyof MetricPoint, 'date'>, number[]> = {
-   anomalyCount:  [ 12, 6, 4],
-   insertCount:   [ 96, 145, 118],
-   tightenCount:  [ 150, 150, 150],
-   loosenCount:   [ 152, 140, 145],
-   okCount:       [ 96, 145, 151],
-   ngCount:       [ 7, 4, 2],
-  }
-
-  const sampleMetrics: MetricPoint[] = DATES.map((date, i) => ({
-   date,
-   anomalyCount: SAMPLE_METRICS.anomalyCount[i] ?? 0,
-   insertCount: SAMPLE_METRICS.insertCount[i] ?? 0,
-   tightenCount: SAMPLE_METRICS.tightenCount[i] ?? 0,
-   loosenCount: SAMPLE_METRICS.loosenCount[i] ?? 0,
-   okCount: SAMPLE_METRICS.okCount[i] ?? 0,
-   ngCount: SAMPLE_METRICS.ngCount[i] ?? 0,
-  }))
-
+  const DATES = recentDates.map((d) => d.label) //['MM/DD', 'MM/DD', 'MM/DD']
+  
   const { data: plcData } = usePlcWebSocket({
     enabled: !isIdle, // モバイル版のみ、30分間操作が無ければ接続を切る（モニタ版はisIdleが常にfalseなので影響しない）
     isPlaying: true,
@@ -211,13 +201,14 @@ export default function App() {
   // RB1・RB2のトルク値・ピーク値・稼働率（PLC Dレジスタは未定のため現状は常に0が返る想定。
   // 確定するまではサンプル値をフォールバックとして使用する）
   const { rb1AxisStats, rb2AxisStats } = usePlcRobotStatusSignals(plcData)
-  // 稼働実績5指標・NG判定信号・サイクルタイム（PLC Dレジスタは未定のため現状は常に0が返る想定。
-  // 確定するまではサンプル値をフォールバックとして使用する。サイクルタイムはPLC値が
-  // 無い場合、サイクル変更タイミング用bitの立上り間隔からコード側で算出した値を使用する）
+
+  // 稼働実績5指標・NG判定信号・サイクルタイム・サイクル開始/終了時刻（PLC Dレジスタは未定のため
+  // 現状は常に0が返る想定。確定するまではサンプル値をフォールバックとして使用する。サイクルタイムは
+  // PLC値が無い場合、サイクル変更タイミング用bitの立上り間隔からコード側で算出した値を使用する）
   // inspectCountはPLC側の検査回数信号（アドレスはoperationMetricsAddresses.ts参照）。
   // 表示上の検査回数はOK回数＋NG回数から算出するようになったためMetricPointへは反映しないが、
   // 信号自体は将来的な用途に備えてそのまま受け取っておく。
-   const {
+  const {
     anomalyCount,
     insertCount,
     tightenCount,
@@ -226,23 +217,53 @@ export default function App() {
     ngCount,
     ngSignal,
     cycleTimeSec,
+    cycleStartTimeRaw,
+    cycleEndTimeRaw,
   } = usePlcOperationMetricsSignals(plcData)
-  
+
+  // サイクル開始時刻が3分以上変化しなければPLC未接続とみなす
+  const isPlcConnected = usePlcConnectionStatus(cycleStartTimeRaw)
+
   const hourlyTrendPoints = useOperationHourlyTrend(anomalyCount, tightenCount, loosenCount)
 
+  // ヘッダー右側の運転状況表示：接続アイコン＋色付きドットのみ（ラベル文字は廃止）
+  const statusDot = (
+    <span className="app-header__status-wrap">
+      <PlcConnectionIcon connected={isPlcConnected} />
+      <span
+        className={`app-header__status-dot${dashboardStatus === '異常' ? ' is-abnormal' : ''}`}
+        style={{
+          backgroundColor: STATUS_DOT_COLOR[dashboardStatus],
+          color: STATUS_DOT_COLOR[dashboardStatus],
+        }}
+        title={`運転状況：${dashboardStatus}`}
+      />
+    </span>
+  )
+
   // 当日分（配列末尾）はPLCの値があればそちらを優先し、無ければサンプル値を使う
-  const liveMetrics: MetricPoint[] = sampleMetrics.map((m, i) => {
-    if (i !== sampleMetrics.length - 1) return m
+  const liveMetrics: MetricPoint[] = DATES.map((date, i) => {
+  if (i !== DATES.length - 1) {
     return {
-      ...m,
-      anomalyCount: anomalyCount || m.anomalyCount,
-      insertCount: insertCount || m.insertCount,
-      tightenCount: tightenCount || m.tightenCount,
-      loosenCount: loosenCount || m.loosenCount,
-      okCount: okCount || m.okCount,
-      ngCount: ngCount || m.ngCount,
+      date,
+      anomalyCount: 0,
+      insertCount: 0,
+      tightenCount: 0,
+      loosenCount: 0,
+      okCount: 0,
+      ngCount: 0,
     }
-  })
+  }
+  return {
+    date,
+    anomalyCount,
+    insertCount,
+    tightenCount,
+    loosenCount,
+    okCount,
+    ngCount,
+  }
+})
 
   // 稼働時間・取付/取出それぞれのサイクルタイム（ベスト／現在）・稼働時間ごとの
   // 異常回数/取付実行回数/取出実行回数の推移は、対応するPLCのDレジスタが未定のため
@@ -250,16 +271,15 @@ export default function App() {
   // サンプル値表示が行われる）。アドレス確定後、config/operationMetricsAddresses.ts に
   // 追加のうえここで配線すること。
 
-const robotRB1 = {
-  motors: rb1AxisStats,
-  utilizationRate: SAMPLE_RB1_UTILIZATION,
-}
+  const robotRB1 = {
+    motors: rb1AxisStats,
+    utilizationRate: SAMPLE_RB1_UTILIZATION,
+  }
 
-
-const robotRB2 = {
-  motors: rb2AxisStats,
-  utilizationRate: SAMPLE_RB2_UTILIZATION,
-}
+  const robotRB2 = {
+    motors: rb2AxisStats,
+    utilizationRate: SAMPLE_RB2_UTILIZATION,
+  }
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -293,11 +313,12 @@ const robotRB2 = {
       window.removeEventListener('resize', update)
     }
   }, [])
+
   useEffect(() => {
-  document.documentElement.style.setProperty(
-    '--panel-offset-x',
-    sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px'
-  )
+    document.documentElement.style.setProperty(
+      '--panel-offset-x',
+      sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0px'
+    )
   }, [sidebarOpen])
 
   return (
@@ -317,98 +338,99 @@ const robotRB2 = {
         className="app-header"
         style={{ borderBottom: `1px solid ${theme.border}` }}
       >
-        <div className="app-header__brand" 
-         style={{ background: isMobile 
-           ? theme.bg 
-           : sidebarOpen 
-             ? mode === 'dark' 
-               ? 'rgba(0,0,0,0.55)' 
-               : 'rgba(180, 178, 178, 0.46)'
-             : theme.bg, transition: 'background 0.1s ease', 
-             }} 
-            >
+        <div
+          className="app-header__brand"
+          style={{
+            background: isMobile
+              ? theme.bg
+              : sidebarOpen
+              ? mode === 'dark'
+                ? 'rgba(0,0,0,0.55)'
+                : 'rgba(180, 178, 178, 0.46)'
+              : theme.bg,
+            transition: 'background 0.1s ease',
+          }}
+        >
           <img src={theme.logo} alt="logo" className="logo" />
-       </div>
+        </div>
 
         {!isMobile && (
-          <span className="app-header__title" style={{ color: theme.subtext,fontSize: '19px', }}>
-           {PAGES.find((p) => p.key === currentPage)?.label}
+          <span className="app-header__title" style={{ color: theme.subtext, fontSize: '19px' }}>
+            {PAGES.find((p) => p.key === currentPage)?.label}
           </span>
         )}
 
-       
-
-      {/* 右側をまとめる */}
-      <div
-        className="header-right"
-        ref={gearBtnRef}
-        style={{
-         position: 'relative',
-         display: 'inline-block',
-         justifySelf: 'end',
-        }}
-        onMouseEnter={() => setIsGearHover(true)}
-        onMouseLeave={() => setIsGearHover(false)}
-       >
-      {!isMobile && <LiveClock />}
-       <button
-         onClick={(e) => {
-          e.stopPropagation()
-          setShowSettings((p) => !p)
-        }}
-       style={{
-        background: showSettings ? `${theme.accent}33` : 'transparent',
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        borderColor: showSettings ? theme.accent : theme.border,
-        borderRadius: '8px',
-        padding: '6px 10px',
-        cursor: 'pointer',
-        fontSize: '15px',
-        lineHeight: 1,
-        transition: 'all 0.2s',
-       }}
+        {/* 右側をまとめる */}
+        <div
+          className="header-right"
+          ref={gearBtnRef}
+          style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifySelf: 'end',
+          }}
+          onMouseEnter={() => setIsGearHover(true)}
+          onMouseLeave={() => setIsGearHover(false)}
         >
-       ⚙️
-       </button>
+          {!isMobile && <LiveClock />}
+          {statusDot}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowSettings((p) => !p)
+            }}
+            style={{
+              background: showSettings ? `${theme.accent}33` : 'transparent',
+              borderWidth: '1px',
+              borderStyle: 'solid',
+              borderColor: showSettings ? theme.accent : theme.border,
+              borderRadius: '8px',
+              padding: '6px 10px',
+              cursor: 'pointer',
+              fontSize: '15px',
+              lineHeight: 1,
+              transition: 'all 0.2s',
+            }}
+          >
+            ⚙️
+          </button>
 
-       <span
-        className="settings-tooltip"
-        style={{
-         position: 'absolute',
-         top: '100%',           // ← bottom指定より安定
-         marginTop: '6px',
-         left: '50%',
-         transform: 'translateX(-50%)',
-         background: 'rgba(0,0,0,0.75)',
-         color: '#fff',
-         fontSize: '11px',
-         padding: '2px 8px',
-         borderRadius: '4px',
-         whiteSpace: 'nowrap',
-         opacity: isTouchDevice ? 0 : (isGearHover ? 1 : 0),
-         pointerEvents: 'none',
-         transition: 'opacity 0.2s',
-         zIndex: 200,
-         }}
-         >
-        設定
-       </span>
-       </div>
-    </header>
- 
+          <span
+            className="settings-tooltip"
+            style={{
+              position: 'absolute',
+              top: '100%', // ← bottom指定より安定
+              marginTop: '6px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: 'rgba(0,0,0,0.75)',
+              color: '#fff',
+              fontSize: '11px',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap',
+              opacity: isTouchDevice ? 0 : isGearHover ? 1 : 0,
+              pointerEvents: 'none',
+              transition: 'opacity 0.2s',
+              zIndex: 200,
+            }}
+          >
+            設定
+          </span>
+        </div>
+      </header>
 
       {/* ヘッダー下レイアウト */}
       <div
-       style={{
-        position: 'relative',
-        flex: 1,
-        minHeight: 0,
-        display: 'flex',
-        flexDirection: 'column',
-       }}
+        style={{
+          position: 'relative',
+          flex: 1,
+          minHeight: 0,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
       >
-      
         {/* サイドバー（内部でモバイル/PCを判定して表示を切替） */}
         <Sidebar
           theme={theme}
@@ -440,7 +462,6 @@ const robotRB2 = {
             <SettingsPanel
               theme={theme}
               themeKey={themeKey}
-    
               isPlaying={isPlaying}
               isEditing={isEditing}
               onThemeChange={setThemeKey}
@@ -455,22 +476,23 @@ const robotRB2 = {
 
         {/* ページコンテンツ（4項目）*/}
         <div className="dashboard-page" style={{ display: currentPage === 'dashboard' ? 'flex' : 'none' }}>
-          <RobotArmDashboard theme={theme} isEditing={isEditing} onEditingChange={setIsEditing}/>
+          <RobotArmDashboard theme={theme} isEditing={isEditing} onEditingChange={setIsEditing} onStatusChange={setDashboardStatus} />
         </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'control' ? 'flex' : 'none' }}>
-         <OperationResults
-           theme={theme}
-           metrics={liveMetrics}
-           isEditing={isEditing}
-           activeStep={activeStep}
-           overallCycleTimeSec={cycleTimeSec}
-           ngSignal={ngSignal}
-           hourlyTrend={hourlyTrendPoints}
-           bladeImageUrl={SHARED_ROBOT_IMAGE_URL}
-           onEditingChange={setIsEditing}
-         />
-       </div>
+          <OperationResults
+            theme={theme}
+            metrics={liveMetrics}
+            isEditing={isEditing}
+            activeStep={activeStep}
+            overallCycleTimeSec={cycleTimeSec}
+            cycleEndTimeRaw={cycleEndTimeRaw}
+            ngSignal={ngSignal}
+            hourlyTrend={hourlyTrendPoints}
+            bladeImageUrl={SHARED_ROBOT_IMAGE_URL}
+            onEditingChange={setIsEditing}
+          />
+        </div>
 
         <div className="dashboard-page" style={{ display: currentPage === 'anomaly' ? 'flex' : 'none' }}>
           <OperationStatus
@@ -492,44 +514,40 @@ const robotRB2 = {
             isAdminOpen={isAdminOpen}
             onAdminOpenChange={setIsAdminOpen}
             dateOptions={recentDates.map((d) => ({ label: d.label, value: d.key }))}
-            
-         />
+          />
         </div>
       </div>
- <footer
-   className="app-footer"
-   style={{
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    width: '100%',
-    padding: '3px 0px',
-    borderTop: `1px solid ${theme.border}`,
-    backgroundColor: theme.surface,
-    display: 'flex',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    zIndex: 100,
-   }}
-   >
-   <span
-    style={{
-      color: theme.text,
-      fontSize: '20px',
-      letterSpacing: '0.5px',
-      fontFamily: '"Yu Gothic", "游ゴシック", sans-serif',
-      fontWeight: 300,
-      fontStyle: 'italic',
-    }}
-  >
-
-    e
-    <span style={{ color: theme.accent }}>X</span>
-    <span style={{ marginRight: '15px' }}>ight</span>
-   </span>
-  </footer>
+      <footer
+        className="app-footer"
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          padding: '3px 0px',
+          borderTop: `1px solid ${theme.border}`,
+          backgroundColor: theme.surface,
+          display: 'flex',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          zIndex: 100,
+        }}
+      >
+        <span
+          style={{
+            color: theme.text,
+            fontSize: '20px',
+            letterSpacing: '0.5px',
+            fontFamily: '"Yu Gothic", "游ゴシック", sans-serif',
+            fontWeight: 500,
+            fontStyle: 'italic',
+          }}
+        >
+          e
+          <span style={{ color: theme.accent }}>X</span>
+          <span style={{ marginRight: '15px' }}>ight</span>
+        </span>
+      </footer>
     </div>
   )
-  
 }
- 
